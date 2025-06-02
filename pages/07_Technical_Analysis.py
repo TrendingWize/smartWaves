@@ -1,6 +1,7 @@
 import os
 import datetime as dt
 from pathlib import Path
+import textwrap
 
 import requests
 import pandas as pd
@@ -32,7 +33,7 @@ def get_ohlcv(ticker: str, date_from: str, date_to: str) -> pd.DataFrame:
     )
     data = requests.get(url, timeout=30).json()
 
-    # ---- normalise to a list of dicts -----------------------------------
+    # --- normalise response ---------------------------------------------
     if isinstance(data, dict):
         rows = data.get("historical", [])
     elif isinstance(data, list):
@@ -41,17 +42,14 @@ def get_ohlcv(ticker: str, date_from: str, date_to: str) -> pd.DataFrame:
         rows = []
 
     if not rows:
-        raise ValueError(
-            f"No price records returned for {ticker} between {date_from} and {date_to}"
-        )
+        raise ValueError(f"No price records for {ticker} in range.")
 
     df = pd.DataFrame(rows).rename(columns=str.lower)
 
-    # ---- harmonise column names ----------------------------------------
-    #if "close" in df.columns and "close" not in df.columns:
-    #    df["close"] = df["close"]
+    # --- harmonise columns ----------------------------------------------
+    if "price" in df.columns and "close" not in df.columns:
+        df["close"] = df["price"]
 
-    # if high/low/open missing, synthesize from close so indicators work
     for col in ("open", "high", "low", "close"):
         if col not in df.columns:
             df[col] = df["close"]
@@ -59,37 +57,31 @@ def get_ohlcv(ticker: str, date_from: str, date_to: str) -> pd.DataFrame:
     if "volume" not in df.columns:
         df["volume"] = 0
 
-    df = (
+    return (
         df.assign(date=lambda d: pd.to_datetime(d["date"]))
           .set_index("date")
           .sort_index()
-    )
-
-    return df[["open", "high", "low", "close", "volume"]]
+        )[["open", "high", "low", "close", "volume"]]
 
 
 def resample(df: pd.DataFrame, frame: str) -> pd.DataFrame:
     if frame == "Daily":
-        out = df
-    else:
-        rule = "W-FRI" if frame == "Weekly" else "M"
-        agg  = {"open": "first", "high": "max", "low": "min",
-                "close": "last", "volume": "sum"}
-        out = df.resample(rule).agg(agg).dropna()
-    return out.rename(columns=str.title)  # Open/High/…
-
+        return df
+    rule = "W-FRI" if frame == "Weekly" else "M"
+    agg  = {"open": "first", "high": "max", "low": "min",
+            "close": "last", "volume": "sum"}
+    return df.resample(rule).agg(agg).dropna()
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 2. Indicators
 # ─────────────────────────────────────────────────────────────────────────────
 def add_indicators(df: pd.DataFrame) -> pd.DataFrame:
-    df["SMA20"]  = ta.sma(df["close"], 20)
-    df["SMA50"]  = ta.sma(df["close"], 50)
-    df["SMA100"] = ta.sma(df["close"], 100)
+    df["sma20"]  = ta.sma(df["close"], 20)
+    df["sma50"]  = ta.sma(df["close"], 50)
+    df["sma100"] = ta.sma(df["close"], 100)
     df = pd.concat([df, ta.macd(df["close"])], axis=1)
-    df["RSI"]    = ta.rsi(df["close"], 14)
+    df["rsi"]    = ta.rsi(df["close"], 14)
     return df
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 3. Composite chart generator
@@ -98,19 +90,22 @@ def save_composite_chart(df: pd.DataFrame, ticker: str, frame: str) -> str:
     fig = plt.figure(figsize=(12, 10))
     gs  = fig.add_gridspec(4, 1, hspace=0.05, height_ratios=[3, 1, 1.5, 1])
 
+    # Price + SMAs
     ax_price = fig.add_subplot(gs[0])
     ax_price.set_yscale("log")
-    ax_price.plot(df.index, df["close"], label="close")
-    ax_price.plot(df.index, df["SMA20"],  label="SMA 20")
-    ax_price.plot(df.index, df["SMA50"],  label="SMA 50")
-    ax_price.plot(df.index, df["SMA100"], label="SMA 100")
+    ax_price.plot(df.index, df["close"], label="Close")
+    ax_price.plot(df.index, df["sma20"],  label="SMA 20")
+    ax_price.plot(df.index, df["sma50"],  label="SMA 50")
+    ax_price.plot(df.index, df["sma100"], label="SMA 100")
     ax_price.set_ylabel("Price (log)")
     ax_price.legend(loc="upper left")
 
+    # Volume
     ax_vol = fig.add_subplot(gs[1], sharex=ax_price)
-    ax_vol.bar(df.index, df["Volume"], color="gray")
+    ax_vol.bar(df.index, df["volume"], color="gray")
     ax_vol.set_ylabel("Vol")
 
+    # MACD
     ax_macd = fig.add_subplot(gs[2], sharex=ax_price)
     ax_macd.plot(df.index, df["MACD_12_26_9"], label="MACD")
     ax_macd.plot(df.index, df["MACDs_12_26_9"], label="Signal")
@@ -118,8 +113,9 @@ def save_composite_chart(df: pd.DataFrame, ticker: str, frame: str) -> str:
     ax_macd.set_ylabel("MACD")
     ax_macd.legend(loc="upper left")
 
+    # RSI
     ax_rsi = fig.add_subplot(gs[3], sharex=ax_price)
-    ax_rsi.plot(df.index, df["RSI"])
+    ax_rsi.plot(df.index, df["rsi"])
     ax_rsi.axhline(70, linestyle="--")
     ax_rsi.axhline(30, linestyle="--")
     ax_rsi.set_ylabel("RSI")
@@ -144,7 +140,6 @@ def save_composite_chart(df: pd.DataFrame, ticker: str, frame: str) -> str:
     plt.close(fig)
     return str(path)
 
-
 # ─────────────────────────────────────────────────────────────────────────────
 # 4. Gemini analysis
 # ─────────────────────────────────────────────────────────────────────────────
@@ -154,7 +149,6 @@ def ask_gemini(image_path: str, prompt: str) -> str:
     img   = Image.open(image_path)
     return model.generate_content([prompt, img]).text.strip()
 
-
 # ─────────────────────────────────────────────────────────────────────────────
 # 5. Streamlit UI
 # ─────────────────────────────────────────────────────────────────────────────
@@ -162,15 +156,14 @@ st.title("📈 Technical Analysis – Composite Chart")
 
 symbol = st.text_input("Ticker (e.g., NVDA):", value="AAPL").upper().strip()
 
-today = dt.date.today()
+today        = dt.date.today()
 default_from = today - dt.timedelta(days=365)
 col_from, col_to = st.columns(2)
 date_from = col_from.date_input("From", default_from)
-date_to   = col_to.date_input("To", today)
+date_to   = col_to.date_input("To",   today)
 
 frame = st.selectbox("Time frame", ["Daily", "Weekly", "Monthly"], index=1)
-
-run = st.button("🚀 Generate Report")
+run   = st.button("🚀 Generate Report")
 
 if run:
     if date_from >= date_to:
@@ -190,13 +183,11 @@ if run:
 
         st.image(chart, use_column_width=True)
 
-        prompt = textwrap.dedent(
-            f"""
+        prompt = textwrap.dedent(f"""
             You are a professional market technician.
-            Analyse this {frame.lower()} composite chart of {symbol} (price log-scale, 20/50/100 SMAs, volume, MACD, RSI).
-            Comment on trend, momentum, support/resistance. Provide price targets for +30, +60, +252 trading days under bullish/base/bearish scenarios.
-            """
-        )
+            Analyse this {frame.lower()} composite chart of {symbol} (log close, 20/50/100 SMAs, volume, MACD, RSI).
+            Comment on trend, momentum, support/resistance. Provide price targets for +30, +60, +252 trading days under bullish, base, bearish scenarios.
+        """)
         with st.spinner("Gemini is thinking …"):
             summary = ask_gemini(chart, prompt)
         st.subheader("🧠 Gemini Commentary")
