@@ -76,7 +76,7 @@ log = logging.getLogger("10-k")
 # Helpers – HTTP
 # ---------------------------------------------------------------------------
 # ------------------------------------------------------------------
-SEC_HEADERS = {
+HEADERS = {
     # REQUIRED – put your project name and a contact e-mail or phone
     "User-Agent": (
         "SmartWave/1.0 (+https://smartwave.example; contact@smartwave.example)"
