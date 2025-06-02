@@ -19,10 +19,12 @@ from typing import List, Tuple
 import httpx, markdown2, nltk, numpy as np, tiktoken
 from bs4 import BeautifulSoup, XMLParsedAsHTMLWarning
 from nltk.data import find as _nltk_find
+from pathlib import Path              # keep this import if you removed it
 
 import streamlit as st
 # ── CONFIG ────────────────────────────────────────────────────────────────
-OUTPUT_DIR = "test_analysis" #); OUTPUT_DIR.mkdir(exist_ok=True)
+OUTPUT_DIR = Path("test_analysis")
+OUTPUT_DIR.mkdir(exist_ok=True)
 
 FMP_API_KEY = st.secrets.get("FMP_API_KEY")
 OPENAI_API_KEY = st.secrets.get("OPENAI_API_KEY")
