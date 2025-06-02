@@ -131,8 +131,7 @@ def extract_text_and_chunk_by_tokens(html_content: str,
     Includes sentence splitting for sentences that exceed token limits.
     """
     if not tiktoken_encoding:
-        logging.error("Tiktoken encoder not available. Cannot perform token-based chunking.")
-        return []
+        pass
 
     logging.info(f"Parsing HTML and chunking text by token limit ({token_limit}) using tiktoken...")
     start_time = time.time()
