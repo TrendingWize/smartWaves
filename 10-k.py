@@ -33,7 +33,7 @@ from openai import AsyncOpenAI, RateLimitError, APIError
 from bs4 import XMLParsedAsHTMLWarning
 import nltk
 from nltk.data import find as _nltk_find
-
+import warnings
 # ---------------------------------------------------------------------------
 # Configuration (override via environment or .env)
 # ---------------------------------------------------------------------------
