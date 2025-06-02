@@ -54,3 +54,6 @@ def sec_filing_analysis_tab_content() -> None:
             pass
         else:
             st.error("No HTML report was produced – check the script output or logs if available.")
+
+st.markdown(report_md, unsafe_allow_html=True)
+
