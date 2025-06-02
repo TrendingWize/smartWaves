@@ -85,28 +85,23 @@ def ask_gemini(img_path: str, prompt: str) -> str:
 # ─────────────────────────────────────────────────────────────────────────────
 # 4. TradingView Advanced Chart embed
 # ─────────────────────────────────────────────────────────────────────────────
-def tradingview_chart(symbol: str, interval: str, theme: str, height: int = 550):
+def tradingview_chart(symbol, interval, theme, width=800, height=500, autosize=False):
     props = {
-        "autosize": True,
+        "autosize": autosize,
         "symbol": symbol,
         "interval": interval,
-        "timezone": "Etc/UTC",
         "theme": theme,
-        "style": "1",
-        "locale": "en",
-        "allow_symbol_change": True,
-        "support_host": "https://www.tradingview.com",
+        # ...
     }
     html_code = f"""
-    <div class="tradingview-widget-container" style="width:100%;height:{height}px;">
-      <div id="tv_chart"></div>
-      <script src="https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js"
-              async type="text/javascript">
-      {json.dumps(props, separators=(",", ":"))}
-      </script>
-    </div>
+      <div style="width:{width}px; height:{height}px;">
+        <div id="tv_chart"></div>
+        <script src="https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js" async>
+        {json.dumps(props)}
+        </script>
+      </div>
     """
-    html(html_code, height=height, scrolling=False)
+    html(html_code, height=height, width=width, scrolling=False)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 5. Streamlit UI
