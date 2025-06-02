@@ -21,3 +21,4 @@ google-generativeai
 httpx[http2]>=0.27.0
 lxml>=5.2
 nltk>=3.8
+markdown2
