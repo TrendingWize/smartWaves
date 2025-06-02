@@ -19,7 +19,7 @@ if check_concurrent_login():
 if not st.session_state.get("logged_in"):
     st.warning("🔒 Please log in to access SEC Filing Analysis.")
     if st.button("🔑 Go to Login"):
-        st.switch_page("pages/00_Login.py")
+        st.switch_page("pages/97_Login.py")
     st.stop()
 
 # Top-right logout
