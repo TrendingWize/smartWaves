@@ -57,13 +57,13 @@ try:
 except ImportError:
     _HTTP2 = False
 
-# openai-python 1.x
-import openai
+import openai  # openai-python ≥1.x
 
 openai_client = openai.AsyncOpenAI(
     api_key=os.getenv("OPENAI_API_KEY") or sys.exit("Set OPENAI_API_KEY")
 )
 
+# NLTK resources
 def _ensure_nltk(model: str) -> None:
     try:
         _nltk_find(f"tokenizers/{model}")
@@ -79,7 +79,7 @@ enc = tiktoken.get_encoding("cl100k_base")
 # ────────────────────────────────────────────
 # 2)  HELPERS
 # ────────────────────────────────────────────
-def _ticker_from_env() -> str:
+def _ticker() -> str:
     t = os.getenv("TICKER_SYMBOL")
     if not t:
         sys.exit("ERROR: set TICKER_SYMBOL env var.")
@@ -94,26 +94,40 @@ async def _fetch_json(client: httpx.AsyncClient, url: str) -> list | dict:
 
 async def _latest_10k_url_fmp(client: httpx.AsyncClient, ticker: str) -> str:
     """
-    Use FMP 'income-statement' endpoint to fetch the most recent FY report and
-    return its SEC filing link (field 'finalLink' or similar).
+    Call /sec-filings-search/symbol for the last 400 days
+    and return the latest 10-K finalLink (or link).
     """
+    today = datetime.utcnow().date()
+    frm   = today - timedelta(days=400)
+
     url = (
-        f"https://financialmodelingprep.com/stable/income-statement"
-        f"?symbol={ticker}&limit=5&apikey={FMP_API_KEY}"
+        "https://financialmodelingprep.com/stable/sec-filings-search/symbol"
+        f"?symbol={ticker}"
+        f"&from={frm.isoformat()}&to={today.isoformat()}"
+        f"&page=0&limit=100&apikey={FMP_API_KEY}"
     )
     data = await _fetch_json(client, url)
     if not data:
-        raise RuntimeError("FMP returned empty list.")
+        raise RuntimeError("FMP filings search returned empty list.")
 
-    # pick the latest FY (period == 'FY')
-    latest = next((d for d in data if d.get("period") == "FY"), data[0])
+    # isolate 10-K (or amended 10-K/A) and pick the most recent by filingDate
+    filings_10k = [
+        f for f in data
+        if isinstance(f.get("formType"), str) and f["formType"].startswith("10-K")
+    ]
+    if not filings_10k:
+        raise RuntimeError("No 10-K filing found in the last 400 days.")
 
-    # locate the link field dynamically (finalLink, link, secLink, filingLink…)
-    for k, v in latest.items():
-        if "link" in k.lower() and isinstance(v, str) and v.startswith("http"):
-            return v.strip()
+    latest = max(
+        filings_10k,
+        key=lambda f: f.get("filingDate", f.get("acceptedDate", "")),
+    )
 
-    raise RuntimeError("No SEC link found in FMP payload.")
+    # prefer finalLink if present, else link
+    link = latest.get("finalLink") or latest.get("link")
+    if not link:
+        raise RuntimeError("Filing object lacks a usable SEC link.")
+    return link.strip()
 
 
 def _extract_text(body: str) -> str:
@@ -127,9 +141,10 @@ def _extract_text(body: str) -> str:
 def _chunk_sentences(text: str) -> List[str]:
     sents = nltk.tokenize.sent_tokenize(text)
     lens = np.fromiter((len(enc.encode(s)) for s in sents), dtype=np.int32)
+
     chunks, buf, buf_len = [], [], 0
     for s, ln in zip(sents, lens):
-        if ln > EMBED_TOKEN_LIMIT:  # break huge sentence
+        if ln > EMBED_TOKEN_LIMIT:
             toks = enc.encode(s)
             for i in range(0, len(toks), EMBED_TOKEN_LIMIT):
                 chunks.append(enc.decode(toks[i : i + EMBED_TOKEN_LIMIT]))
@@ -197,12 +212,12 @@ async def _analyse(ticker: str, context: str) -> dict[str, str]:
 # 3)  MAIN
 # ────────────────────────────────────────────
 async def main() -> None:
-    ticker = _ticker_from_env()
+    ticker = _ticker()
 
     async with httpx.AsyncClient(http2=_HTTP2, follow_redirects=True) as client:
-        sec_link = await _latest_10k_url_fmp(client, ticker)
-        print(f"Downloading filing … {sec_link}")
-        html = await client.get(sec_link, headers=SEC_HEADERS, timeout=REQUEST_TIMEOUT)
+        sec_url = await _latest_10k_url_fmp(client, ticker)
+        print(f"Downloading filing … {sec_url}")
+        html = await client.get(sec_url, headers=SEC_HEADERS, timeout=REQUEST_TIMEOUT)
         html.raise_for_status()
         text = _extract_text(html.text)
 
