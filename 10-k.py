@@ -1,6 +1,6 @@
 
 # ── CONFIG ────────────────────────────────────────────────────────────────
-OUTPUT_DIR = Path("test_analysis"); OUTPUT_DIR.mkdir(exist_ok=True)
+OUTPUT_DIR = "test_analysis") #; OUTPUT_DIR.mkdir(exist_ok=True)
 
 FMP_API_KEY = os.getenv("FMP_API_KEY", "Aw0rlddPHSnxmi3VmZ6jN4u3b2vvUvxn")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY") or sys.exit("Set OPENAI_API_KEY")
