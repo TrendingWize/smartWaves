@@ -146,6 +146,7 @@ frame       = col_frame.selectbox("Indicator frame", ["Daily", "Weekly", "Monthl
 tv_int      = col_tvint.selectbox("TV interval", ["1", "15", "30", "60", "D", "W", "M"], index=4)
 run_btn = st.button("🚀 Generate")
 autosz  = st.checkbox("Autosize width", value=True)
+theme   = st.radio("Theme", ["auto","light","dark"], horizontal=True)
 
 
 if run_btn:
