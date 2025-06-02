@@ -101,6 +101,20 @@ except LookupError:
 
 # ------------------------------------------------------------------
 
+# ── NLTK resources -------------------------------------------------------
+def _ensure_nltk(model: str) -> None:
+    """Download `model` quietly if it is not already present."""
+    try:
+        _nltk_find(f"tokenizers/{model}")
+    except LookupError:
+        nltk.download(model, quiet=True)
+
+for _m in ("punkt", "punkt_tab"):
+    _ensure_nltk(_m)
+
+# ── Silence BeautifulSoup’s XML-parsed-as-HTML warning -------------------
+warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
+
 async def _fetch_json(client: httpx.AsyncClient, url: str, **kw) -> Any:
     try:
         r = await client.get(url, headers=SEC_HEADERS, timeout=REQUEST_TIMEOUT, **kw)
