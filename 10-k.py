@@ -30,6 +30,9 @@ import faiss, httpx, tiktoken, nltk, html
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 from openai import AsyncOpenAI, RateLimitError, APIError
+from bs4 import XMLParsedAsHTMLWarning
+import nltk
+from nltk.data import find as _nltk_find
 
 # ---------------------------------------------------------------------------
 # Configuration (override via environment or .env)
