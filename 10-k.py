@@ -76,7 +76,7 @@ log = logging.getLogger("10-k")
 # Helpers – HTTP
 # ---------------------------------------------------------------------------
 # ------------------------------------------------------------------
-HEADERS = {
+SEC_HEADERS = {
     # REQUIRED – put your project name and a contact e-mail or phone
     "User-Agent": (
         "SmartWave/1.0 (+https://smartwave.example; contact@smartwave.example)"
@@ -90,7 +90,7 @@ HEADERS = {
 
 async def _fetch_json(client: httpx.AsyncClient, url: str, **kw) -> Any:
     try:
-        r = await client.get(url, headers=HEADERS, timeout=REQUEST_TIMEOUT, **kw)
+        r = await client.get(url, headers=SEC_HEADERS, timeout=REQUEST_TIMEOUT, **kw)
         r.raise_for_status()
         return r.json()
     except Exception as e:
