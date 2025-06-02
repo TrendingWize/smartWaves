@@ -25,23 +25,20 @@ import tiktoken
 from bs4 import BeautifulSoup, XMLParsedAsHTMLWarning
 from nltk.data import find as _nltk_find
 
-# ────────────────────────────────────────────
-# 0)  CONFIGURATION
-# ────────────────────────────────────────────
-OUTPUT_DIR = Path("test_analysis")
-OUTPUT_DIR.mkdir(exist_ok=True)
+# ───────────────────────────────────────────────────────────────────────────
+# 0) CONFIGURATION
+# ───────────────────────────────────────────────────────────────────────────
+OUTPUT_DIR = Path("test_analysis"); OUTPUT_DIR.mkdir(exist_ok=True)
 
-EMBED_MODEL = "text-embedding-3-small"
-EMBED_TOKEN_LIMIT = 800
-EMBED_BATCH_SIZE = 128
+FMP_API_KEY     = os.getenv("FMP_API_KEY","Aw0rlddPHSnxmi3VmZ6jN4u3b2vvUvxn")
+OPENAI_API_KEY  = os.getenv("OPENAI_API_KEY") or sys.exit("Set OPENAI_API_KEY")
 
-CHAT_MODEL = "gpt-4o-mini"
-MAX_CHAT_TOKENS = 4096
-
-REQUEST_TIMEOUT = 30.0
-
-FMP_API_KEY = st.secrets.get("FMP_API_KEY") or os.getenv("FMP_API_KEY", "")
-
+EMBED_MODEL         = "text-embedding-3-small"
+EMBED_TOKEN_LIMIT   = 800
+EMBED_BATCH_SIZE    = 128
+CHAT_MODEL          = "gpt-4o-mini"
+MAX_CONCURRENT_Q    = 5          # parallel GPT calls
+REQUEST_TIMEOUT     = 30.0
 
 SEC_HEADERS = {
     "User-Agent": "SmartWave/1.0 (+https://smartwave.example; contact@smartwave.example)",
@@ -222,6 +219,10 @@ async def main()->None:
     md_path.write_text(md,"utf-8")
     html_path.write_text(markdown2.markdown(md,extras=["tables"]),"utf-8")
     print("\n✓ Markdown:",md_path,"\n✓ HTML:",html_path)
+
+# ───────────────────────────────────────────────────────────────────────────
+if __name__=="__main__":
+    asyncio.run(main())
 
 # ───────────────────────────────────────────────────────────────────────────
 if __name__=="__main__":
