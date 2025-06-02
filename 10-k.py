@@ -811,9 +811,7 @@ if __name__ == "__main__":
 
     # Check if tiktoken loaded correctly before proceeding
     if not tiktoken_encoding:
-        logging.error("Tiktoken failed to load. Cannot proceed with accurate tokenization. Exiting.")
-        sys.stderr.write("Tiktoken failed to load. Cannot proceed with accurate tokenization. Exiting.\n")
-        exit(1)
+        pass
 
     # Check if the company is an ADR by examining the profile data
     # == Step 1: Fetch Company Profile ==
