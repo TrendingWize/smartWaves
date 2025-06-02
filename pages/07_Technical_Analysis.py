@@ -1,5 +1,5 @@
 # smart_waves/pages/07_Technical_Analysis.py
-import os, json, textwrap, datetime as dt
+import json, textwrap, datetime as dt
 from pathlib import Path
 
 import requests, pandas as pd, pandas_ta as ta
@@ -8,8 +8,6 @@ import streamlit as st
 from streamlit.components.v1 import html
 from PIL import Image
 import google.generativeai as genai
-from streamlit.components.v1 import html
-from streamlit.components.v1 import html
 
 # ░░ Streamlit config ░░
 st.set_page_config(page_title="Technical Analysis", layout="wide")
@@ -33,18 +31,19 @@ def get_ohlcv(ticker: str, date_from: str, date_to: str) -> pd.DataFrame:
         raise ValueError("No price data returned")
 
     df = pd.DataFrame(rows).rename(columns=str.lower)
-
-    # harmonise minimal endpoint (price+volume only)
-    if "price" in df.columns and "close" not in df.columns:
+    if "price" in df and "close" not in df:
         df["close"] = df["price"]
+
     for col in ("open", "high", "low", "close"):
         df[col] = df.get(col, df["close"])
     df["volume"] = df.get("volume", 0)
 
-    return (df.assign(date=lambda d: pd.to_datetime(d["date"]))
-              .set_index("date")
-              .sort_index()
-              [["open","high","low","close","volume"]])
+    return (
+        df.assign(date=lambda d: pd.to_datetime(d["date"]))
+          .set_index("date")
+          .sort_index()
+          [["open","high","low","close","volume"]]
+    )
 
 def resample(df: pd.DataFrame, frame: str) -> pd.DataFrame:
     if frame == "Daily":
@@ -54,7 +53,7 @@ def resample(df: pd.DataFrame, frame: str) -> pd.DataFrame:
     return df.resample(rule).agg(agg).dropna()
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 2. Indicators & static composite (for Gemini)
+# 2. Indicators & composite (Gemini)
 # ─────────────────────────────────────────────────────────────────────────────
 def add_indicators(df: pd.DataFrame) -> pd.DataFrame:
     df["sma20"]  = ta.sma(df["close"], 20)
@@ -68,10 +67,10 @@ def save_composite_chart(df: pd.DataFrame, ticker: str, frame: str) -> str:
     fig, ax = plt.subplots(figsize=(12, 6))
     ax.set_yscale("log")
     ax.plot(df.index, df["close"], label="Close")
-    ax.plot(df.index, df["sma20"], label="SMA20")
-    ax.plot(df.index, df["sma50"], label="SMA50")
+    ax.plot(df.index, df["sma20"],  label="SMA20")
+    ax.plot(df.index, df["sma50"],  label="SMA50")
     ax.plot(df.index, df["sma100"], label="SMA100")
-    ax.legend(); ax.set_title(f"{ticker} ({frame}) log‐close + SMAs")
+    ax.legend(); ax.set_title(f"{ticker} ({frame})")
     path = OUT_DIR / f"{ticker}_{frame}_composite.png"
     fig.tight_layout(); fig.savefig(path, dpi=120); plt.close(fig)
     return str(path)
@@ -85,11 +84,19 @@ def ask_gemini(img_path: str, prompt: str) -> str:
     return model.generate_content([prompt, Image.open(img_path)]).text.strip()
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 4. TradingView Advanced Chart embed
+# 4. TradingView Advanced-Chart embed
 # ─────────────────────────────────────────────────────────────────────────────
-def tradingview_chart(symbol, interval, theme, width=800, height=500, autosize=False):
+def tradingview_chart(symbol: str,
+                      interval: str = "D",
+                      theme: str = "light",
+                      height: int = 550,
+                      width: int | None = None,
+                      autosize: bool = True):
+    """Embed TradingView Advanced Chart.  
+       • autosize=True  → fills parent width (Streamlit column)  
+       • autosize=False → fixed width passed via `width` arg."""
     props = {
-        "autosize": True,
+        "autosize": autosize,
         "symbol": symbol,
         "interval": interval,
         "theme": theme,
@@ -100,19 +107,20 @@ def tradingview_chart(symbol, interval, theme, width=800, height=500, autosize=F
         "support_host": "https://www.tradingview.com",
     }
 
-    html_code = f"""
-      <div class="tradingview-widget-container" style="width:100%; height:{height}px;">
-        <div id="tv_widget"></div>
-        <script type="text/javascript"
-                src="https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js"
-                async>
-        {json.dumps(props, separators=(",", ":"))}
-        </script>
-      </div>
-    """
+    outer_style = f"height:{height}px;"
+    if not autosize and width:
+        outer_style += f"width:{width}px;"
 
-    # width=None → Streamlit lets the iframe be as wide as its parent
-    html(html_code, height=height, width=None, scrolling=False)
+    html_code = f"""
+    <div class="tradingview-widget-container" style="{outer_style}">
+      <div id="tv_widget"></div>
+      <script src="https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js"
+              async type="text/javascript">
+      {json.dumps(props, separators=(",", ":"))}
+      </script>
+    </div>
+    """
+    html(html_code, height=height, width=width if not autosize else None, scrolling=False)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 5. Streamlit UI
@@ -120,47 +128,46 @@ def tradingview_chart(symbol, interval, theme, width=800, height=500, autosize=F
 st.title("📈 Technical Analysis – Interactive & AI Insights")
 
 symbol = st.text_input("Ticker", value="AAPL").upper().strip()
+today = dt.date.today(); default_from = today - dt.timedelta(days=365)
+c1, c2 = st.columns(2)
+date_from = c1.date_input("From", default_from)
+date_to   = c2.date_input("To",   today)
 
-today = dt.date.today()
-default_from = today - dt.timedelta(days=365)
-col1, col2 = st.columns(2)
-date_from = col1.date_input("From", default_from)
-date_to   = col2.date_input("To",   today)
-
-frame   = st.selectbox("Resample for indicators", ["Daily","Weekly","Monthly"])
-tv_int  = st.selectbox("TradingView interval", ["1","15","30","60","D","W","M"], index=4)
+frame   = st.selectbox("Indicator frame", ["Daily","Weekly","Monthly"])
+tv_int  = st.selectbox("TV interval", ["1","15","30","60","D","W","M"], index=4)
 theme   = st.radio("Theme", ["auto","light","dark"], horizontal=True)
+height  = st.slider("Chart height (px)", 400, 1000, 600)
+autosz  = st.checkbox("Autosize width", value=True)
 run_btn = st.button("🚀 Generate")
 
 if run_btn:
     if date_from >= date_to:
-        st.error("From-date must be earlier than To-date"); st.stop()
+        st.error("From-date must precede To-date"); st.stop()
     if not (FMP_API_KEY and GOOGLE_API_KEY):
         st.info("Add FMP_API_KEY & GOOGLE_API_KEY to secrets"); st.stop()
 
-    # auto theme -> follow Streamlit base
     if theme == "auto":
         theme = "dark" if st.get_option("theme.base") == "dark" else "light"
 
-    try:
-        with st.spinner("Fetching price data …"):
-            raw = get_ohlcv(symbol, date_from.isoformat(), date_to.isoformat())
-            df  = add_indicators(resample(raw, frame))
+    with st.spinner("Fetching data …"):
+        raw = get_ohlcv(symbol, date_from.isoformat(), date_to.isoformat())
+        df  = add_indicators(resample(raw, frame))
 
-        # TradingView widget
-        st.subheader("🔹 Interactive Chart")
-        tradingview_chart(symbol=f"NASDAQ:{symbol}", interval=tv_int, theme=theme, height=800)
+    st.subheader("🔹 Interactive Chart")
+    tradingview_chart(symbol=f"NASDAQ:{symbol}",
+                      interval=tv_int,
+                      theme=theme,
+                      height=height,
+                      autosize=autosz,
+                      width=None if autosz else 800)   # change 800 if you want different fixed width
 
-        # Static composite for Gemini
-        composite = save_composite_chart(df, symbol, frame)
-        prompt = textwrap.dedent(f"""
-           You are a professional market technician.
-           Analyse this {frame.lower()} composite chart of {symbol} (log close & SMAs 20/50/100, volume, MACD, RSI).
-           Discuss trend, momentum, support/resistance. Provide price targets for +30, +60, +252 trading days (bullish / base / bearish).
-        """)
-        with st.spinner("Gemini is thinking …"):
-            st.subheader("🧠 Gemini Commentary")
-            st.markdown(ask_gemini(composite, prompt))
-
-    except Exception as exc:
-        st.error(f"Error: {exc}")
+    # Gemini commentary
+    comp = save_composite_chart(df, symbol, frame)
+    prompt = textwrap.dedent(f"""
+        You are a professional market technician.
+        Analyse this {frame.lower()} composite chart of {symbol} (log close, SMAs, volume, MACD, RSI).
+        Discuss trend, momentum, support/resistance. Give price targets for +30, +60, +252 trading days (bullish/base/bearish).
+    """)
+    with st.spinner("Gemini is thinking …"):
+        st.subheader("🧠 Gemini Commentary")
+        st.markdown(ask_gemini(comp, prompt))
