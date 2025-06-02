@@ -91,7 +91,7 @@ def tradingview_chart(symbol: str, interval: str = "D",
         "timezone": "Etc/UTC",
         "allow_symbol_change": True,
         "support_host": "https://www.tradingview.com",
-         autosize=False, 
+         
     }
     outer_style = f"height:{height}px;" + (f"width:{width}px;" if (not autosize and width) else "")
     html_code = f"""
@@ -132,7 +132,7 @@ if run_btn:
     # --- Interactive chart -------------------------------------------------
     st.subheader("🔹 Interactive Chart")
     tradingview_chart(symbol=tv_symbol, interval=tv_int, theme=theme,
-                      height=height, autosize=autosz,
+                      height=height, autosize=False,
                       width=None if autosz else 800)
 
     # --- Derive plain ticker for Python analysis (last part after ':')
