@@ -1,128 +1,103 @@
 #!/usr/bin/env python
 """
-10-k.py  –  async, vectorised & batch‑optimised implementation
-============================================================
+10-k.py  ──  Download the latest 10-K for a given TICKER_SYMBOL,
+summarise it with OpenAI, and write a coloured Markdown + HTML report.
 
-This refactor focuses on raw speed and lower cost while preserving the original
-behaviour (download latest 10‑K, embed, answer questions, write colourful
-Markdown ➜ HTML).  Major changes:
-
-*   **httpx.AsyncClient** with HTTP/2 for all network I/O (3–4× faster wall‑time)
-*   **Vectorised token counting** using *tiktoken* + *NumPy*
-*   **Large embedding batches** (128 by default) instead of 16
-*   **Single‑shot Q&A** – all questions answered in one chat call
-*   **ETag caching** so repeat runs skip unchanged filings
-*   Environment‑driven tunables for timeouts, batch size, workers, etc.
-*   Tidier logging and a JSON timing footer to aid profiling in Streamlit.
-
-You can drop this file straight into *smart_waves/* and keep
-`sec_filing_analysis.py` unchanged.  Tested on Python 3.12.
+Dependencies (add to requirements.txt):
+    httpx[http2]>=0.27.0
+    beautifulsoup4>=4.12
+    lxml>=5.2
+    nltk>=3.8
+    numpy>=1.26
+    tiktoken>=0.6
+    openai>=1.25
+    markdown2>=2.4
 """
+
 from __future__ import annotations
 
-import asyncio, json, logging, os, pickle, re, time
-from hashlib import blake2s
-from pathlib import Path
-from typing import Any, List, Tuple
-import streamlit as st
-import numpy as np
-import faiss, httpx, tiktoken, nltk, html
-from bs4 import BeautifulSoup
-from dotenv import load_dotenv
-from openai import AsyncOpenAI, RateLimitError, APIError
-from bs4 import XMLParsedAsHTMLWarning
-import nltk
-from nltk.data import find as _nltk_find
+import asyncio
+import json
+import os
+import re
+import sys
+import textwrap
 import warnings
-# ---------------------------------------------------------------------------
-# Configuration (override via environment or .env)
-# ---------------------------------------------------------------------------
-load_dotenv()
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import List
 
-SYMBOL = os.environ.get("TICKER_SYMBOL")
-OPENAI_API_KEY = st.secrets.get("OPENAI_API_KEY") or os.getenv("OPENAI_API_KEY", "")
-FMP_API_KEY= st.secrets.get("FMP_API_KEY") or os.getenv("FMP_API_KEY", "")
+import httpx
+import markdown2
+import nltk
+import numpy as np
+import tiktoken
+from bs4 import BeautifulSoup, XMLParsedAsHTMLWarning
+from nltk.data import find as _nltk_find
+from tqdm.asyncio import tqdm_asyncio
 
-OUTPUT_DIR = Path(os.getenv("OUTPUT_DIR", "test_analysis"))
-OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+# ────────────────────────────────────────────
+# 0)  CONFIGURATION
+# ────────────────────────────────────────────
+OUTPUT_DIR = Path("test_analysis")
+OUTPUT_DIR.mkdir(exist_ok=True)
 
-# Embeddings / LLM
-EMBED_MODEL                = os.getenv("EMBED_MODEL", "text-embedding-3-large")
-EMBED_DIM                  = 3072  # for text-embedding-3-large
-EMBED_TOKEN_LIMIT          = 1500  # safety margin under 8191
-EMBED_BATCH_SIZE           = int(os.getenv("EMBED_BATCH_SIZE", 128))
-LLM_MODEL                  = os.getenv("LLM_MODEL", "gpt-4o-mini")
-LLM_MAX_TOKENS             = int(os.getenv("LLM_MAX_TOKENS", 4000))
-LLM_TEMPERATURE            = float(os.getenv("LLM_TEMPERATURE", 0.2))
+EMBED_MODEL = "text-embedding-3-small"
+EMBED_TOKEN_LIMIT = 800  # max tokens per embedding chunk
+EMBED_BATCH_SIZE = 128
 
-# Networking
-REQUEST_TIMEOUT            = int(os.getenv("REQUEST_TIMEOUT", 30))
-USER_AGENT                 = (
-    os.getenv("USER_AGENT")
-    or "SmartWaveBot/1.0 (+https://github.com/yourorg)"
-)
+CHAT_MODEL = "gpt-4o-mini"  # or "gpt-3.5-turbo-0125"
+MAX_CHAT_TOKENS = 4096      # truncate context if it gets too large
 
-# Caching
-FORCE_REPROCESS            = os.getenv("FORCE_REPROCESS", "0") == "1"
+REQUEST_TIMEOUT = 30.0
 
-# ---------------------------------------------------------------------------
-# Logging setup
-# ---------------------------------------------------------------------------
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s %(levelname)s | %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S",
-)
-log = logging.getLogger("10-k")
-
-# ---------------------------------------------------------------------------
-# Helpers – HTTP
-# ---------------------------------------------------------------------------
-# ------------------------------------------------------------------
+# SEC requires a descriptive UA
 SEC_HEADERS = {
-    # REQUIRED – put your project name and a contact e-mail or phone
-    "User-Agent": (
-        "SmartWave/1.0 (+https://smartwave.example; contact@smartwave.example)"
-    ),
-    # Nice to have – keeps responses small
+    "User-Agent": "SmartWave/1.0 (+https://smartwave.example; contact@smartwave.example)",
     "Accept-Encoding": "gzip, deflate",
-    # Helps a little with some edge-cache rules
     "Accept-Language": "en-US,en;q=0.9",
 }
 
-# ----------------------------------------------------------------------------
-# 1) Ensure NLTK 'punkt' tokenizer is available (for sent_tokenize)
-#    – Downloads once per container; cached under ~/nltk_data
-# ----------------------------------------------------------------------------
+# ────────────────────────────────────────────
+# 1)  ENVIRONMENT & LIBRARY SET-UP
+# ────────────────────────────────────────────
 try:
-    _nltk_find("tokenizers/punkt")
-except LookupError:
-    nltk.download("punkt", quiet=True)
+    import h2  # noqa: F401  # enables HTTP/2 support in httpx
+    _HTTP2 = True
+except ImportError:
+    _HTTP2 = False
 
-# ------------------------------------------------------------------
+# openai-python 1.x
+import openai
+openai_key = os.getenv("OPENAI_API_KEY")
+if not openai_key:
+    sys.exit("ERROR: set OPENAI_API_KEY in environment.")
+openai_client = openai.AsyncOpenAI(api_key=openai_key)
 
-# ── NLTK resources -------------------------------------------------------
+# Ensure NLTK tokenisers are available
 def _ensure_nltk(model: str) -> None:
-    """Download `model` quietly if it is not already present."""
     try:
         _nltk_find(f"tokenizers/{model}")
     except LookupError:
         nltk.download(model, quiet=True)
 
-for _m in ("punkt", "punkt_tab"):
-    _ensure_nltk(_m)
+for m in ("punkt", "punkt_tab"):
+    _ensure_nltk(m)
 
-# ── Silence BeautifulSoup’s XML-parsed-as-HTML warning -------------------
 warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
 
-async def _fetch_json(client: httpx.AsyncClient, url: str, **kw) -> Any:
-    try:
-        r = await client.get(url, headers=SEC_HEADERS, timeout=REQUEST_TIMEOUT, **kw)
-        r.raise_for_status()
-        return r.json()
-    except Exception as e:
-        log.error("GET %s failed: %s", url, e)
-        raise
+# tiktoken encoder
+enc = tiktoken.get_encoding("cl100k_base")
+
+# ────────────────────────────────────────────
+# 2)  HELPER FUNCTIONS
+# ────────────────────────────────────────────
+def _ticker_from_env() -> str:
+    ticker = os.getenv("TICKER_SYMBOL")
+    if not ticker:
+        sys.exit("ERROR: TICKER_SYMBOL env var is required.")
+    return ticker.upper()
+
 
 async def _fetch_text(client: httpx.AsyncClient, url: str) -> str:
     r = await client.get(url, headers=SEC_HEADERS, timeout=REQUEST_TIMEOUT)
@@ -130,177 +105,181 @@ async def _fetch_text(client: httpx.AsyncClient, url: str) -> str:
     return r.text
 
 
-# ---------------------------------------------------------------------------
-# Caching helpers – based on ETag or hash of body
-# ---------------------------------------------------------------------------
+def _latest_10k_url(cik: str) -> str:
+    """Return the inline-XBRL (htm) link for most recent 10-K filing."""
+    # SEC's fast-search JSON endpoint
+    url = (
+        f"https://data.sec.gov/submissions/CIK{cik.zfill(10)}.json"
+    )
+    r = httpx.get(url, headers=SEC_HEADERS, timeout=REQUEST_TIMEOUT)
+    r.raise_for_status()
+    data = r.json()
 
-def _cache_path(key: str, ext: str) -> Path:
-    h = blake2s(key.encode(), digest_size=10).hexdigest()
-    return OUTPUT_DIR / f"{SYMBOL.lower()}_{h}.{ext}"
+    filings = data["filings"]["recent"]
+    for idx, form in enumerate(filings["form"]):
+        if form == "10-K":
+            accession = filings["accessionNumber"][idx].replace("-", "")
+            return (
+                f"https://www.sec.gov/Archives/edgar/data/"
+                f"{int(cik)}/{accession}/{data['tickers'][0].lower()}-{accession}-"
+                "xbrl.htm"
+            )
+    raise RuntimeError("No 10-K found.")
 
-# ---------------------------------------------------------------------------
-# Text extraction & chunking
-# ---------------------------------------------------------------------------
-enc = tiktoken.encoding_for_model(EMBED_MODEL)
 
-def _html_to_text(body: str) -> str:
-    soup = BeautifulSoup(body, "lxml")
-    return soup.get_text(" ", strip=True)
+def _extract_text_from_html(body: str) -> str:
+    soup = BeautifulSoup(body, "lxml")  # HTML parser is fine for inline-XBRL
+    # crude drop of tables / scripts
+    for tag in soup(["script", "style", "table"]):
+        tag.decompose()
+    text = soup.get_text("\n")
+    text = re.sub(r"\n{2,}", "\n", text)  # collapse blank lines
+    return text.strip()
 
-def _chunk_sentences(text: str, *, token_limit: int) -> List[str]:
-    sentences = nltk.tokenize.sent_tokenize(text)
-    # Vectorised token counting
-    tok_counts = np.fromiter((len(enc.encode(s)) for s in sentences), dtype=np.int32)
 
-    chunks, current, cur_tokens = [], [], 0
-    for sent, tok in zip(sentences, tok_counts):
-        if tok > token_limit:
-            # hard cut if a *single* sentence is too big
-            parts = [sent[i:i+400] for i in range(0, len(sent), 400)]
-            for p in parts:
-                chunks.append(p)
+def _chunk_sentences(text: str, token_limit: int) -> List[str]:
+    """Return a list of sentence chunks, each ≤ token_limit."""
+    sents = nltk.tokenize.sent_tokenize(text)
+    # vectorise token counts
+    lengths = np.fromiter((len(enc.encode(s)) for s in sents), dtype=np.int32)
+
+    chunks, buf, buf_len = [], [], 0
+    for sent, sent_len in zip(sents, lengths):
+        if sent_len > token_limit:  # rare: chop long sentence
+            subtoks = enc.encode(sent)
+            for i in range(0, len(subtoks), token_limit):
+                chunk = enc.decode(subtoks[i : i + token_limit])
+                chunks.append(chunk)
             continue
-        if cur_tokens + tok > token_limit:
-            chunks.append(" ".join(current))
-            current, cur_tokens = [], 0
-        current.append(sent)
-        cur_tokens += tok
-    if current:
-        chunks.append(" ".join(current))
-    log.info("Chunked into %d slices (≤%d tokens)", len(chunks), token_limit)
+
+        if buf_len + sent_len > token_limit:
+            chunks.append(" ".join(buf))
+            buf, buf_len = [], 0
+        buf.append(sent); buf_len += sent_len
+
+    if buf:
+        chunks.append(" ".join(buf))
     return chunks
 
-# ---------------------------------------------------------------------------
-# Embedding & FAISS helpers
-# ---------------------------------------------------------------------------
-client_ai = AsyncOpenAI(api_key=OPENAI_API_KEY)
 
-async def _embed_batch(texts: List[str]) -> List[np.ndarray]:
-    resp = await client_ai.embeddings.create(input=texts, model=EMBED_MODEL)
-    return [np.array(e.embedding, dtype=np.float32) for e in resp.data]
+def _color(txt: str, hex_: str) -> str:
+    return f'<span style="color:{hex_}">{txt}</span>'
 
-async def embed_texts(texts: List[str]) -> Tuple[faiss.IndexFlatL2, List[str]]:
-    vectors: List[np.ndarray] = []
-    for i in range(0, len(texts), EMBED_BATCH_SIZE):
-        batch = texts[i : i + EMBED_BATCH_SIZE]
-        vectors.extend(await _embed_batch(batch))
-        log.debug("embedded %d/%d", len(vectors), len(texts))
-    mat = np.vstack(vectors)
-    index = faiss.IndexFlatL2(mat.shape[1])
-    index.add(mat)
-    return index, texts
 
-# ---------------------------------------------------------------------------
-# LLM Q&A – single‑shot prompt
-# ---------------------------------------------------------------------------
-QUESTIONS = [
-    "What are the main growth opportunities highlighted in the filing?",
-    "Summarise the company's competitive advantages mentioned.",
-    "What are the key risks mentioned in the filing?",
-    "What are the company's stated strategic priorities and future plans?",
-]
+def _build_markdown(ticker: str, sections: list[tuple[str, str, str]]) -> str:
+    header = f"# **{ticker} 10-K Analysis**\n\n"
+    body_lines: list[str] = []
+    for title, txt, hex_c in sections:
+        body_lines.append(f"## {title}\n")
+        for line in txt.splitlines():
+            if line.strip():
+                body_lines.append(f"- {_color(line.strip(), hex_c)}")
+        body_lines.append("")  # blank line
+    return header + "\n".join(body_lines)
 
-async def ask_llm(index: faiss.IndexFlatL2, texts: List[str]) -> str:
-    # Pull top context for each question (k=1)
-    ctx_chunks = []
-    for q in QUESTIONS:
-        _, idx = index.search(np.array([[0.0]*index.d], dtype=np.float32), 1)  # dummy search replaced next line
-    # (the search logic would normally embed Q – omitted for brevity)
 
-    prompt = (
-        "You are a financial analyst.  Using the 10‑K context provided, answer the"
-        " following questions in colourful Markdown.  Use headings and bullet"
-        " lists.\n\n"
-    )
-    for q in QUESTIONS:
-        prompt += f"- {q}\n"
+async def _embed_chunks(chunks: List[str]) -> List[List[float]]:
+    vectors: List[List[float]] = []
+    for batch_start in range(0, len(chunks), EMBED_BATCH_SIZE):
+        batch = chunks[batch_start : batch_start + EMBED_BATCH_SIZE]
+        res = await openai_client.embeddings.create(
+            model=EMBED_MODEL,
+            input=batch,
+        )
+        vectors.extend([d.embedding for d in res.data])
+    return vectors
 
-    chat = await client_ai.chat.completions.create(
-        model=LLM_MODEL,
-        max_tokens=LLM_MAX_TOKENS,
-        temperature=LLM_TEMPERATURE,
+
+async def _generate_analysis(ticker: str, context: str) -> dict[str, str]:
+    prompt = textwrap.dedent(
+        f"""
+        You are an equity research analyst. Summarise the following 10-K filing
+        for {ticker}. Your reply MUST be valid JSON with keys:
+            summary        – 3-5 bullet lines (one string, lines separated by \\n)
+            risks          – 3-5 bullets
+            opportunities  – 3-5 bullets
+
+        Use plain text; no Markdown bullets inside values.
+        Filing begins below delimited by <FILING></FILING>.
+
+        <FILING>
+        {context}
+        </FILING>
+        """
+    ).strip()
+
+    # keep context within model limits
+    prompt_tokens = len(enc.encode(prompt))
+    if prompt_tokens > MAX_CHAT_TOKENS - 1024:
+        # truncate from the end (least relevant)
+        excess = prompt_tokens - (MAX_CHAT_TOKENS - 1024)
+        keep = enc.encode(prompt)[:-excess]
+        prompt = enc.decode(keep)
+
+    chat = await openai_client.chat.completions.create(
+        model=CHAT_MODEL,
+        response_format={"type": "json_object"},
+        max_tokens=1024,
+        temperature=0.3,
         messages=[
-            {"role": "system", "content": prompt},
+            {"role": "system", "content": "You are a precise financial analyst."},
+            {"role": "user", "content": prompt},
         ],
     )
-    return chat.choices[0].message.content
+    return json.loads(chat.choices[0].message.content)
 
-# ---------------------------------------------------------------------------
-# Main driver
-# ---------------------------------------------------------------------------
+
+# ────────────────────────────────────────────
+# 3)  MAIN ORCHESTRATION
+# ────────────────────────────────────────────
 async def main() -> None:
-    start = time.time()
-    if not (OPENAI_API_KEY and FMP_API_KEY):
-        raise SystemExit("Missing API keys – check environment")
+    ticker = _ticker_from_env()
 
-    async with httpx.AsyncClient(http2=True, follow_redirects=True) as client:
-        # 1. Determine latest filing link
-        filings_url = f"https://financialmodelingprep.com/api/v3/sec_filings/{SYMBOL}?type=10-k&page=0&apikey={FMP_API_KEY}"
-        filings = await _fetch_json(client, filings_url)
-        if not filings:
-            raise SystemExit("No filings found")
-        final_link = filings[0]["finalLink"]
-        filing_date = filings[0]["fillingDate"].split()[0]
-        base = f"{SYMBOL}_{filing_date}_{EMBED_MODEL.replace('/','_')}"
+    # resolve CIK
+    cik_lookup = httpx.get(
+        f"https://www.sec.gov/files/company_tickers.json", headers=SEC_HEADERS, timeout=REQUEST_TIMEOUT
+    ).json()
+    ticker_map = {v["ticker"]: v["cik_str"] for v in cik_lookup.values()}
+    if ticker not in ticker_map:
+        sys.exit(f"Ticker {ticker} not found in SEC list.")
+    cik = str(ticker_map[ticker])
 
-        html_path = OUTPUT_DIR / f"{base}.html"
-        pkl_path  = OUTPUT_DIR / f"{base}_texts.pkl"
-        idx_path  = OUTPUT_DIR / f"{base}_faiss.bin"
+    filing_url = _latest_10k_url(cik)
+    print(f"Downloading filing … ({filing_url})")
 
-        if not FORCE_REPROCESS and html_path.exists() and pkl_path.exists() and idx_path.exists():
-            log.info("Cached artefacts detected – skip download & embedding")
-            with open(html_path, "r", encoding="utf-8") as fp:
-                analysis_md = fp.read()
-        else:
-            # 2. Download filing HTML (with simple ETag check)
-            log.info("Downloading filing ...")
-            filing_html = await _fetch_text(client, final_link)
-            text = _html_to_text(filing_html)
-            chunks = _chunk_sentences(text, token_limit=EMBED_TOKEN_LIMIT)
-            index, texts = await embed_texts(chunks)
-            # Persist embeddings
-            faiss.write_index(index, str(idx_path))
-            with open(pkl_path, "wb") as fp:
-                pickle.dump(texts, fp)
-            # 3. Ask LLM once
-            analysis_md = await ask_llm(index, texts)
-            html_path.write_text(analysis_md, encoding="utf-8")
+    async with httpx.AsyncClient(http2=_HTTP2, follow_redirects=True) as client:
+        html = await _fetch_text(client, filing_url)
 
-    dur = time.time() - start
-    meta = {"symbol": SYMBOL, "seconds": round(dur, 2), "chunks": len(chunks)}
-    log.info("DONE in %.1fs", dur)
-    print(json.dumps(meta))
+    text = _extract_text_from_html(html)
+    chunks = _chunk_sentences(text, token_limit=EMBED_TOKEN_LIMIT)
 
-# ------------------------------------------------------------------
-# 1)  Utility: wrap a fragment in a colored <span>
-# ------------------------------------------------------------------
-def color(text: str, hex_color: str) -> str:
-    """Return HTML that renders `text` in `hex_color` inside Markdown."""
-    return f'<span style="color:{hex_color}">{text}</span>'
+    # optional: embed (not used further but left in for future semantic work)
+    print(f"Embedding {len(chunks)} chunks …")
+    await _embed_chunks(chunks)
 
-# ------------------------------------------------------------------
-# 2)  Assemble the report
-# ------------------------------------------------------------------
-header = "# **SEC Filing Analysis**\n"      # original header
-header += "\n"                              # <-- blank line right after H1
+    # use the first ~12 000 words as context (enough for GPT-4 mini)
+    context_excerpt = " ".join(text.split()[:12000])
+    analysis = await _generate_analysis(ticker, context_excerpt)
 
-sections = [
-    ("Summary",    summary_text,   "#008000"),  # green
-    ("Key Risks",  risk_text,      "#d00000"),  # red
-    ("Opportunities", opp_text,    "#0057e7"),  # blue
-]
+    # build coloured Markdown
+    sections = [
+        ("Summary",        analysis["summary"],       "#008000"),
+        ("Key Risks",      analysis["risks"],         "#d00000"),
+        ("Opportunities",  analysis["opportunities"], "#0057e7"),
+    ]
+    md = _build_markdown(ticker, sections)
+    ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
 
-# Build the body with inline-colored spans
-body_lines = []
-for title, txt, hex_c in sections:
-    body_lines.append(f"## {title}\n")
-    # each bullet gets colored
-    for line in txt.splitlines():
-        if line.strip():
-            body_lines.append(f"- {color(line.strip(), hex_c)}")
-    body_lines.append("")         # blank line between sections
+    md_path = OUTPUT_DIR / f"{ticker}_10-K_{ts}.md"
+    md_path.write_text(md, encoding="utf-8")
 
-report_md = header + "\n".join(body_lines)
+    html_path = OUTPUT_DIR / f"{ticker}_10-K_{ts}.html"
+    html_path.write_text(markdown2.markdown(md, extras=["tables"]), encoding="utf-8")
 
+    print(f"\n✓ Markdown written to {md_path}")
+    print(f"✓ HTML written to {html_path}")
+
+
+# ────────────────────────────────────────────
 if __name__ == "__main__":
     asyncio.run(main())
