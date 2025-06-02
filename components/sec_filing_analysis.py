@@ -1,4 +1,6 @@
+# smart_waves/pages/components/sec_filing_analysis.py
 import subprocess, os, pathlib, streamlit as st
+import sys # <--- Added import for sys
 
 OUTPUT_DIR = "test_analysis"
 K_SCRIPT   = "10-k.py"
@@ -7,13 +9,20 @@ Q_SCRIPT   = "10-q.py"
 def _run_generator(script: str, ticker: str) -> pathlib.Path | None:
     env = os.environ.copy()
     env["TICKER_SYMBOL"] = ticker.upper()
-    proc = subprocess.run(["python", script], env=env,
+    # Use sys.executable to ensure the same Python interpreter is used
+    proc = subprocess.run([sys.executable, script], env=env, # <--- Changed "python" to sys.executable
                           stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
     if proc.returncode != 0:
         st.error(f"{script} failed.\n\n```{proc.stderr or proc.stdout}```")
         return None
 
-    htmls = sorted(pathlib.Path(OUTPUT_DIR).rglob("*.html"), key=os.path.getmtime)
+    # Ensure OUTPUT_DIR exists before trying to list files in it
+    output_path = pathlib.Path(OUTPUT_DIR)
+    if not output_path.exists():
+        st.error(f"Output directory '{OUTPUT_DIR}' does not exist. The script might not have run correctly or created it.")
+        return None
+        
+    htmls = sorted(output_path.rglob("*.html"), key=os.path.getmtime)
     return htmls[-1] if htmls else None
 
 def sec_filing_analysis_tab_content() -> None:
@@ -29,9 +38,18 @@ def sec_filing_analysis_tab_content() -> None:
         if html_path and html_path.exists():
             st.success("Report generated!")
             with st.expander("► View report"):
-                st.components.v1.html(html_path.read_text(encoding="utf-8"),
-                                      height=800, scrolling=True)
-            st.download_button("Download HTML", html_path.read_bytes(),
-                               file_name=html_path.name, mime="text/html")
+                try:
+                    st.components.v1.html(html_path.read_text(encoding="utf-8"),
+                                          height=800, scrolling=True)
+                except Exception as e:
+                    st.error(f"Error reading or displaying HTML report: {e}")
+            try:
+                st.download_button("Download HTML", html_path.read_bytes(),
+                                   file_name=html_path.name, mime="text/html")
+            except Exception as e:
+                st.error(f"Error preparing HTML report for download: {e}")
+
+        elif html_path is None and proc.returncode != 0: # Error already displayed by _run_generator
+            pass
         else:
-            st.error("No HTML report was produced – check the script output.")
+            st.error("No HTML report was produced – check the script output or logs if available.")
