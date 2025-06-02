@@ -131,8 +131,10 @@ if run_btn:
 
     # --- Interactive chart -------------------------------------------------
     st.subheader("🔹 Interactive Chart")
-    tradingview_chart(symbol=tv_symbol, interval=tv_int, theme=theme,
-                      height=height, autosize=autosz,
+    tradingview_chart(symbol=tv_symbol,
+                      interval=tv_int, theme=theme,
+                      height=height,
+                      autosize=False,
                       width=None if autosz else 800)
 
     # --- Derive plain ticker for Python analysis (last part after ':')
