@@ -6,24 +6,24 @@ OUTPUT_DIR = "test_analysis"
 K_SCRIPT   = "10-k.py"
 Q_SCRIPT   = "10-q.py"
 
-def _run_generator(script: str, ticker: str) -> pathlib.Path | None:
+def _run_generator(script: str, ticker: str) -> tuple[pathlib.Path | None, subprocess.CompletedProcess | None]:
     env = os.environ.copy()
     env["TICKER_SYMBOL"] = ticker.upper()
-    # Use sys.executable to ensure the same Python interpreter is used
-    proc = subprocess.run([sys.executable, script], env=env, # <--- Changed "python" to sys.executable
+    proc = subprocess.run([sys.executable, script], env=env,
                           stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+
     if proc.returncode != 0:
         st.error(f"{script} failed.\n\n```{proc.stderr or proc.stdout}```")
-        return None
+        return None, proc
 
-    # Ensure OUTPUT_DIR exists before trying to list files in it
     output_path = pathlib.Path(OUTPUT_DIR)
     if not output_path.exists():
-        st.error(f"Output directory '{OUTPUT_DIR}' does not exist. The script might not have run correctly or created it.")
-        return None
-        
+        st.error(f"Output directory '{OUTPUT_DIR}' does not exist.")
+        return None, proc
+
     htmls = sorted(output_path.rglob("*.html"), key=os.path.getmtime)
-    return htmls[-1] if htmls else None
+    return (htmls[-1] if htmls else None), proc
+
 
 def sec_filing_analysis_tab_content() -> None:
     st.subheader("SEC Filing Analysis")
