@@ -143,7 +143,7 @@ if run_btn:
 
         # TradingView widget
         st.subheader("🔹 Interactive Chart")
-        tradingview_chart(symbol=f"NASDAQ:{symbol}", interval=tv_int, theme=theme, height=550)
+        tradingview_chart(symbol=f"NASDAQ:{symbol}", interval=tv_int, theme=theme, height=1500)
 
         # Static composite for Gemini
         composite = save_composite_chart(df, symbol, frame)
