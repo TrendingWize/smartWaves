@@ -9,11 +9,11 @@ load_global_css()
 
 st.title("🧠 AI-Powered Financial Analysis")
 
-if not st.session_state.get("logged_in", False):
-    st.warning("?? Please log in to access the Financial Dashboard.")
-    if st.button("?? Go to Login"):
-        st.switch_page("pages/97_Login.py")
-    st.stop()
+#if not st.session_state.get("logged_in", False):
+ #   st.warning("?? Please log in to access the Financial Dashboard.")
+  #  if st.button("?? Go to Login"):
+   #     st.switch_page("pages/97_Login.py")
+    #st.stop()
     
 symbol = st.text_input("Enter a Company Symbol", value="AAPL")
 report_period = st.selectbox("Select Report Period", ["annual", "quarter"])
