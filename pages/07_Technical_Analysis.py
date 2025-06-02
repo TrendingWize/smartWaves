@@ -136,7 +136,7 @@ date_to   = c2.date_input("To",   today)
 frame   = st.selectbox("Indicator frame", ["Daily","Weekly","Monthly"])
 tv_int  = st.selectbox("TV interval", ["1","15","30","60","D","W","M"], index=4)
 theme   = st.radio("Theme", ["auto","light","dark"], horizontal=True)
-height  = st.slider("Chart height (px)", 400, 1000, 600)
+height  = 750
 autosz  = st.checkbox("Autosize width", value=True)
 run_btn = st.button("🚀 Generate")
 
