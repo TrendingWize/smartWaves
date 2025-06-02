@@ -8,6 +8,8 @@ import streamlit as st
 from streamlit.components.v1 import html
 from PIL import Image
 import google.generativeai as genai
+from streamlit.components.v1 import html
+from streamlit.components.v1 import html
 
 # ░░ Streamlit config ░░
 st.set_page_config(page_title="Technical Analysis", layout="wide")
@@ -87,21 +89,30 @@ def ask_gemini(img_path: str, prompt: str) -> str:
 # ─────────────────────────────────────────────────────────────────────────────
 def tradingview_chart(symbol, interval, theme, width=800, height=500, autosize=False):
     props = {
-        "autosize": autosize,
+        "autosize": True,
         "symbol": symbol,
         "interval": interval,
         "theme": theme,
-        # ...
+        "style": "1",
+        "locale": "en",
+        "timezone": "Etc/UTC",
+        "allow_symbol_change": True,
+        "support_host": "https://www.tradingview.com",
     }
+
     html_code = f"""
-      <div style="width:{width}px; height:{height}px;">
-        <div id="tv_chart"></div>
-        <script src="https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js" async>
-        {json.dumps(props)}
+      <div class="tradingview-widget-container" style="width:100%; height:{height}px;">
+        <div id="tv_widget"></div>
+        <script type="text/javascript"
+                src="https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js"
+                async>
+        {json.dumps(props, separators=(",", ":"))}
         </script>
       </div>
     """
-    html(html_code, height=height, width=width, scrolling=False)
+
+    # width=None → Streamlit lets the iframe be as wide as its parent
+    html(html_code, height=height, width=None, scrolling=False)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 5. Streamlit UI
