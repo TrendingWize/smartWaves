@@ -2,8 +2,8 @@
 # ── CONFIG ────────────────────────────────────────────────────────────────
 OUTPUT_DIR = "test_analysis" #); OUTPUT_DIR.mkdir(exist_ok=True)
 
-FMP_API_KEY = os.getenv("FMP_API_KEY", "Aw0rlddPHSnxmi3VmZ6jN4u3b2vvUvxn")
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY") or sys.exit("Set OPENAI_API_KEY")
+FMP_API_KEY = st.secrets.get("FMP_API_KEY")
+OPENAI_API_KEY = st.secrets.get("OPENAI_API_KEY")
 
 EMBED_MODEL       = "text-embedding-3-small"
 CHAT_MODEL        = "gpt-4o-mini"
