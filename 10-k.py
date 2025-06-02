@@ -89,6 +89,16 @@ SEC_HEADERS = {
     # Helps a little with some edge-cache rules
     "Accept-Language": "en-US,en;q=0.9",
 }
+
+# ----------------------------------------------------------------------------
+# 1) Ensure NLTK 'punkt' tokenizer is available (for sent_tokenize)
+#    – Downloads once per container; cached under ~/nltk_data
+# ----------------------------------------------------------------------------
+try:
+    _nltk_find("tokenizers/punkt")
+except LookupError:
+    nltk.download("punkt", quiet=True)
+
 # ------------------------------------------------------------------
 
 async def _fetch_json(client: httpx.AsyncClient, url: str, **kw) -> Any:
