@@ -9,7 +9,6 @@ from bs4 import BeautifulSoup # For HTML parsing
 import lxml # Parser for BeautifulSoup
 import numpy as np
 import faiss
-# Removed: import voyageai
 from openai import OpenAI, RateLimitError, APIError # Import specific errors
 from dotenv import load_dotenv
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -18,6 +17,18 @@ import html # For escaping HTML characters in the output and recursive formattin
 import tiktoken # <-- Added for token counting
 import streamlit as st
 import sys # <-- Added for sys.stderr
+import nltk
+import warnings
+from bs4 import XMLParsedAsHTMLWarning
+
+# Suppress XML parsing warning
+warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
+
+# Ensure nltk 'punkt' tokenizer is available
+try:
+    nltk.data.find("tokenizers/punkt")
+except LookupError:
+    nltk.download("punkt", quiet=True)
 
 # --- Configuration (Keep variable names and values) ---
 symbol = os.environ.get("TICKER_SYMBOL")
