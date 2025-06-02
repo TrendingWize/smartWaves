@@ -155,7 +155,7 @@ if run_btn:
 
     st.subheader("🔹 Interactive Chart")
     tradingview_chart(exchange = st.selectbox("Exchange", ["NASDAQ", "NYSE", "AMEX"])
-    tv_symbol = f"{exchange}:{symbol}"
+    symbol = f"{exchange}:{symbol}"
                       interval=tv_int,
                       theme=theme,
                       height=height,
