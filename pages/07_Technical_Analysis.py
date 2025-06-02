@@ -78,10 +78,17 @@ def ask_gemini(img_path: str, prompt: str) -> str:
 # ─────────────────────────────────────────────────────────────────────────────
 # 4. TradingView Advanced-Chart helper
 # ─────────────────────────────────────────────────────────────────────────────
-def tradingview_chart(symbol: str, interval: str = "D",
-                      theme: str = "light", height: int = 750,
-                      width: int | None = None, autosize: bool = True):
-    # — widget options —
+def tradingview_chart(
+        symbol: str,
+        interval: str = "D",
+        theme: str = "light",
+        height: int = 750,
+        width: int | None = None,
+        autosize: bool = True,
+    ):
+    """Embed TradingView Advanced Chart."""
+
+    # ---- widget options passed to TradingView JS ------------------------
     props = {
         "symbol": symbol,
         "interval": interval,
@@ -91,73 +98,33 @@ def tradingview_chart(symbol: str, interval: str = "D",
         "timezone": "Etc/UTC",
         "allow_symbol_change": True,
         "support_host": "https://www.tradingview.com",
-        "height": height,                # 👈 tell TV how tall to be
+        "height": height,          # chart canvas height
     }
     if autosize:
-        props["autosize"] = True         # fill parent width
+        props["autosize"] = True          # fills column width
     else:
-        props["width"] = width or 800    # fixed pixel width
+        props["width"] = width or 800     # fixed width if autosize off
+
+    # ---- outer <div> style ---------------------------------------------
+    outer_style = f"height:{height}px;"
+    if not autosize:
+        outer_style += f"width:{(width or 800)}px;"
+
+    # ---- HTML injection -------------------------------------------------
     html_code = f"""
     <div class="tradingview-widget-container" style="{outer_style}">
       <div id="tv_widget"></div>
       <script src="https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js"
-              async type="text/javascript">{json.dumps(props)}</script>
+              async type="text/javascript">
+      {json.dumps(props, separators=(",", ":"))}
+      </script>
     </div>
     """
-    html(html_code, height=height, width=width if not autosize else None, scrolling=False)
 
-# ─────────────────────────────────────────────────────────────────────────────
-# 5. Streamlit UI
-# ─────────────────────────────────────────────────────────────────────────────
-st.title("📈 Technical Analysis – Interactive & AI Insights")
+    html(
+        html_code,
+        height=height,
+        width=None if autosize else (width or 800),
+        scrolling=False,
+    )
 
-# single-row input strip
-col_sym, col_from, col_to, col_frame, col_tv = st.columns([3,2,2,2,2])
-tv_symbol = col_sym.text_input("TradingView Symbol", value="NASDAQ:AAPL").upper().strip()
-today = dt.date.today()
-date_from = col_from.date_input("From", today - dt.timedelta(days=365))
-date_to   = col_to.date_input("To",   today)
-frame  = col_frame.selectbox("Indicator frame", ["Daily","Weekly","Monthly"])
-tv_int = col_tv.selectbox("TV interval", ["1","15","30","60","D","W","M"], index=4)
-height=750
-theme   = st.radio("Theme", ["auto","light","dark"], horizontal=True)
-autosz  = st.checkbox("Autosize width", value=True)
-run_btn = st.button("🚀 Generate")
-
-if run_btn:
-    if date_from >= date_to:
-        st.error("From-date must precede To-date"); st.stop()
-    if theme == "auto":
-        theme = "dark" if st.get_option("theme.base") == "dark" else "light"
-    if not (FMP_API_KEY and GOOGLE_API_KEY):
-        st.info("Add FMP_API_KEY & GOOGLE_API_KEY to secrets"); st.stop()
-
-    # --- Interactive chart -------------------------------------------------
-    st.subheader("🔹 Interactive Chart")
-    tradingview_chart(symbol=tv_symbol,
-                      interval=tv_int, theme=theme,
-                      height=height,
-                      autosize=False,
-                      width=None if autosz else 800)
-
-    # --- Derive plain ticker for Python analysis (last part after ':')
-    analysis_ticker = re.split(r"[:/]", tv_symbol)[-1]  # e.g. "AAPL" in "NASDAQ:AAPL"
-
-    try:
-        with st.spinner("Fetching price data …"):
-            raw = get_ohlcv(analysis_ticker, date_from.isoformat(), date_to.isoformat())
-            df  = add_indicators(resample(raw, frame))
-
-        comp = save_composite_chart(df, analysis_ticker, frame)
-        prompt = textwrap.dedent(f"""
-            You are a professional market technician.
-            Analyse this {frame.lower()} composite chart of {analysis_ticker}
-            (log close, SMAs, volume, MACD, RSI). Provide trend, support/resistance,
-            and price targets for +30, +60, +252 trading days (bullish / base / bearish).
-        """)
-        with st.spinner("Gemini is thinking …"):
-            st.subheader("🧠 Gemini Commentary")
-            st.markdown(ask_gemini(comp, prompt))
-
-    except Exception as exc:
-        st.error(f"Error: {exc}")
