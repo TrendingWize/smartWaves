@@ -1,4 +1,26 @@
+#!/usr/bin/env python
+"""
+10-k.py ─ Semantic-search Q&A over latest 10-K
 
+Requires in requirements.txt:
+    httpx[http2]>=0.27.0   beautifulsoup4>=4.12
+    lxml>=5.2             nltk>=3.8
+    numpy>=1.26           tiktoken>=0.6
+    openai>=1.25          markdown2>=2.4
+"""
+
+from __future__ import annotations
+
+import asyncio, json, os, re, sys, textwrap, warnings
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+from typing import List, Tuple
+
+import httpx, markdown2, nltk, numpy as np, tiktoken
+from bs4 import BeautifulSoup, XMLParsedAsHTMLWarning
+from nltk.d
+
+import streamlit as st
 # ── CONFIG ────────────────────────────────────────────────────────────────
 OUTPUT_DIR = "test_analysis" #); OUTPUT_DIR.mkdir(exist_ok=True)
 
