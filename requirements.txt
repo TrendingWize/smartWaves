@@ -19,4 +19,4 @@ streamlit-navigation-bar>=0.0.6
 tenacity>=8.2.3
 pandas_ta
 matplotlib
-google.generativeai
+google-generativeai
