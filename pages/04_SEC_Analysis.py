@@ -4,7 +4,7 @@ import streamlit as st
 from utils import initialize_session_state, check_concurrent_login
 from utils import logout_user
 from components.sec_filing_analysis import sec_filing_analysis_tab_content
-import requests
+
 # Page configuration
 st.set_page_config(page_title="SEC Filing Analysis", layout="wide")
 
