@@ -130,8 +130,8 @@ def extract_text_and_chunk_by_tokens(html_content: str,
     and then chunks based on tiktoken token counts to respect model limits.
     Includes sentence splitting for sentences that exceed token limits.
     """
-    if not tiktoken_encoding:
-        pass
+    logging.error("Tiktoken encoder not available. Cannot perform token-based chunking.")
+        return []
 
     logging.info(f"Parsing HTML and chunking text by token limit ({token_limit}) using tiktoken...")
     start_time = time.time()
@@ -177,7 +177,7 @@ def extract_text_and_chunk_by_tokens(html_content: str,
                         test_part = current_part + part
                         
                     try:
-                        part_tokens = len(tiktoken_encoding.encode(test_part))
+                        part_tokens = len(.encode(test_part))
                     except Exception:
                         part_tokens = len(test_part) // 3  # Rough estimate if encoding fails
                         
@@ -208,7 +208,7 @@ def extract_text_and_chunk_by_tokens(html_content: str,
                     test_part = part
                     
                 try:
-                    part_tokens = len(tiktoken_encoding.encode(test_part))
+                    part_tokens = len(.encode(test_part))
                 except Exception:
                     part_tokens = len(test_part) // 3  # Rough estimate if encoding fails
                     
@@ -233,7 +233,7 @@ def extract_text_and_chunk_by_tokens(html_content: str,
         
         for word in words:
             try:
-                word_tokens = len(tiktoken_encoding.encode(word))
+                word_tokens = len(.encode(word))
             except Exception:
                 word_tokens = len(word) // 3  # Rough estimate if encoding fails
                 
@@ -280,7 +280,7 @@ def extract_text_and_chunk_by_tokens(html_content: str,
             sentence_tokens = sentence_token_cache[trimmed_sentence]
         else:
             try:
-                sentence_tokens = len(tiktoken_encoding.encode(trimmed_sentence))
+                sentence_tokens = len(.encode(trimmed_sentence))
                 sentence_token_cache[trimmed_sentence] = sentence_tokens
             except Exception as e:
                 logging.warning(f"Could not encode sentence for token count: {e}. Skipping sentence: '{trimmed_sentence[:50]}...'")
@@ -301,7 +301,7 @@ def extract_text_and_chunk_by_tokens(html_content: str,
             
             # Process each split part as if it were a regular sentence
             for part in split_parts:
-                part_tokens = len(tiktoken_encoding.encode(part))
+                part_tokens = len(.encode(part))
                 
                 # Check if adding this part would exceed token limit
                 if current_chunk_tokens > 0 and (current_chunk_tokens + part_tokens + 1) > token_limit:
@@ -311,7 +311,7 @@ def extract_text_and_chunk_by_tokens(html_content: str,
                         chunk_text = chunk_prefix + " ".join(current_chunk_sentences)
                         # Double check the final chunk's token count
                         try:
-                            final_chunk_tokens = len(tiktoken_encoding.encode(chunk_text))
+                            final_chunk_tokens = len(.encode(chunk_text))
                             if final_chunk_tokens <= token_limit:
                                 chunks.append(chunk_text)
                             else:
@@ -328,7 +328,7 @@ def extract_text_and_chunk_by_tokens(html_content: str,
                         if current_chunk_sentences:
                             try:
                                 overlap_text = " ".join(current_chunk_sentences)
-                                current_chunk_tokens = len(tiktoken_encoding.encode(overlap_text))
+                                current_chunk_tokens = len(.encode(overlap_text))
                             except Exception as e:
                                 logging.warning(f"Could not encode overlapping sentences for token count: {e}. Resetting overlap.")
                                 current_chunk_sentences = []
@@ -353,7 +353,7 @@ def extract_text_and_chunk_by_tokens(html_content: str,
                 chunk_text = chunk_prefix + " ".join(current_chunk_sentences)
                 # Double check the final chunk's token count just in case
                 try:
-                    final_chunk_tokens = len(tiktoken_encoding.encode(chunk_text))
+                    final_chunk_tokens = len(.encode(chunk_text))
                     if final_chunk_tokens <= token_limit:
                          chunks.append(chunk_text)
                     else:
@@ -371,7 +371,7 @@ def extract_text_and_chunk_by_tokens(html_content: str,
                 if current_chunk_sentences:
                     try:
                         overlap_text = " ".join(current_chunk_sentences)
-                        current_chunk_tokens = len(tiktoken_encoding.encode(overlap_text))
+                        current_chunk_tokens = len(.encode(overlap_text))
                     except Exception as e:
                          logging.warning(f"Could not encode overlapping sentences for token count: {e}. Resetting overlap.")
                          current_chunk_sentences = []
@@ -396,7 +396,7 @@ def extract_text_and_chunk_by_tokens(html_content: str,
         chunk_prefix = f"[Chunk {len(chunks) + 1}] "
         chunk_text = chunk_prefix + " ".join(current_chunk_sentences)
         try:
-            final_chunk_tokens = len(tiktoken_encoding.encode(chunk_text))
+            final_chunk_tokens = len(.encode(chunk_text))
             if final_chunk_tokens <= token_limit:
                 chunks.append(chunk_text)
             else:
@@ -808,6 +808,11 @@ def format_analysis_data_recursively(data, level=0):
 if __name__ == "__main__":
     logging.info(f"--- Starting Analysis for Ticker: {symbol} using OpenAI Embeddings ({OPENAI_EMBEDDING_MODEL}) ---")
     overall_start_time = time.time()
+
+    # Check if tiktoken loaded correctly before proceeding
+    logging.error("Tiktoken failed to load. Cannot proceed with accurate tokenization. Exiting.")
+        sys.stderr.write("Tiktoken failed to load. Cannot proceed with accurate tokenization. Exiting.\n")
+        exit(1)
 
     # Check if the company is an ADR by examining the profile data
     # == Step 1: Fetch Company Profile ==
