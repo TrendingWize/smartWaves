@@ -17,10 +17,13 @@ import nltk
 import html # For escaping HTML characters in the output and recursive formatting
 import tiktoken # <-- Added for token counting
 import streamlit as st
+import sys # <-- Added for sys.stderr
+
 # --- Configuration (Keep variable names and values) ---
 symbol = os.environ.get("TICKER_SYMBOL")
 if not symbol:
     logging.error("TICKER_SYMBOL environment variable not set. Exiting.")
+    sys.stderr.write("TICKER_SYMBOL environment variable not set. Exiting.\n")
     exit(1)
     
 # Use environment variables or set to None initially
@@ -58,7 +61,8 @@ financial_api_key = "Aw0rlddPHSnxmi3VmZ6jN4u3b2vvUvxn" # Example Key
 # Check necessary keys now
 if not all([openAI_api_key , financial_api_key ]):
     logging.error("Required API keys (OpenAI, FMP) not found. Please check your .env file or environment variables.")
-    exit()
+    sys.stderr.write("Required API keys (OpenAI, FMP) not found. Please check your .env file or environment variables.\n")
+    exit(1)
 
 # --- Initialize API Clients ---
 try:
@@ -67,7 +71,8 @@ try:
     logging.info("OpenAI client initialized successfully.")
 except Exception as e:
     logging.error(f"Failed to initialize OpenAI client: {e}")
-    exit()
+    sys.stderr.write(f"Failed to initialize OpenAI client: {e}\n")
+    exit(1)
 
 # --- Initialize Tiktoken Encoder ---
 try:
@@ -77,16 +82,31 @@ try:
 except Exception as e:
     logging.error(f"Could not load tiktoken encoding for model {OPENAI_EMBEDDING_MODEL}: {e}")
     logging.error("Tiktoken is required for accurate chunking. Please install it (`pip install tiktoken`) and ensure the model name is correct.")
-    tiktoken_encoding = None # Set to None to indicate failure
-    exit() # Exit if tiktoken fails, as chunking relies on it
+    sys.stderr.write(f"Could not load tiktoken encoding for model {OPENAI_EMBEDDING_MODEL}: {e}. Tiktoken is required.\n")
+    tiktoken_encoding = None 
+    exit(1) 
 
 # --- NLTK Download Check ---
 try:
     nltk.data.find('tokenizers/punkt')
-except nltk.downloader.DownloadError:
-    logging.info("NLTK 'punkt' tokenizer not found. Downloading...")
-    nltk.download('punkt')
-    logging.info("NLTK 'punkt' downloaded.")
+    logging.info("NLTK 'punkt' tokenizer found.")
+except LookupError:
+    logging.warning("NLTK 'punkt' tokenizer not found. Attempting to download...")
+    try:
+        nltk.download('punkt', quiet=False) 
+        logging.info("NLTK 'punkt' download attempt completed. Verifying...")
+        nltk.data.find('tokenizers/punkt') 
+        logging.info("NLTK 'punkt' tokenizer is now available.")
+    except LookupError: 
+        logging.error("NLTK 'punkt' still not found after download attempt. This may be due to network issues, permissions, or an incomplete download.")
+        logging.error(f"NLTK data path includes: {nltk.data.path}")
+        sys.stderr.write("Critical NLTK resource 'punkt' could not be downloaded or found. Please check network and permissions. Exiting.\n")
+        exit(1)
+    except Exception as e: 
+        logging.error(f"An error occurred during NLTK 'punkt' download: {e}")
+        logging.error(f"NLTK data path includes: {nltk.data.path}")
+        sys.stderr.write(f"Critical NLTK resource 'punkt' could not be downloaded due to: {e}. Exiting.\n")
+        exit(1)
 
 # --- Helper Functions ---
 
@@ -446,7 +466,7 @@ def generate_openai_embeddings(chunks: List[str], openai_model: str, batch_size:
                         else:
                             raise # Re-raise if max retries reached for APIError too
                 # Check if break was called (success)
-                if 'response' in locals():
+                if 'response' in locals(): # Check if response variable was assigned
                     break
             else: # This else block executes if the loop finished without a break (i.e., all retries failed)
                 logging.error(f"Skipping batch {batch_num} due to persistent API errors after {max_retries} attempts.")
@@ -802,7 +822,8 @@ if __name__ == "__main__":
     # Check if tiktoken loaded correctly before proceeding
     if not tiktoken_encoding:
         logging.error("Tiktoken failed to load. Cannot proceed with accurate tokenization. Exiting.")
-        exit()
+        sys.stderr.write("Tiktoken failed to load. Cannot proceed with accurate tokenization. Exiting.\n")
+        exit(1)
 
     # Check if the company is an ADR by examining the profile data
     # == Step 1: Fetch Company Profile ==
@@ -812,52 +833,50 @@ if __name__ == "__main__":
     isAdr = False
     if profile_data and isinstance(profile_data, list) and len(profile_data) > 0:
         company_profile = profile_data[0]
-        # Check if 'isAdr' field exists in the profile and is True
-        # Or alternatively check if 'isActivelyTrading' is False, depending on API structure
         isAdr = company_profile.get('isAdr', False)
-        
         logging.info(f"Company ADR status: {isAdr}")
     else:
         logging.warning("Could not determine ADR status due to missing profile data. Proceeding with default (False).")
     
     # == CHECK ADDED HERE: If isAdr is True, print message and exit ==
+    # For 10-K, we process 20-F for ADRs. This check is more for 10-Q.
+    # However, the original code had an exit commented out.
+    # For 10-K, if it's an ADR, we should fetch '20-f'.
     if isAdr:
         filing_type = '20-f'
+        logging.info(f"Company is an ADR. Will look for 20-F filings instead of 10-K.")
     else:
         filing_type= '10-k'
-        message = "sorry , ADR companies have no 10-Q fillings, the service works with American companies only."
-        logging.error(f"Execution stopped: Company identified as an ADR (isAdr={isAdr}). Cannot process ADR filings with this script. {message}")
-        print(message)  # Print the required message to standard output
-        #exit()          # Stop script execution immediately
         
-    
     logging.info(f"Searching for latest '{filing_type}' filing...")
     filings_url = f'https://financialmodelingprep.com/api/v3/sec_filings/{symbol}'
     params = {
         "type": filing_type,
-        "page": 0, # Get the most recent page
+        "page": 0, 
         "apikey": financial_api_key
     }
     filings_data = fetch_fmp_data(filings_url, params=params)
     final_link = None
-    filing_date = "unknown_date" # Changed variable name for consistency
+    filing_date = "unknown_date" 
     if filings_data and isinstance(filings_data, list) and len(filings_data) > 0:
          first_filing = filings_data[0]
          if isinstance(first_filing, dict):
             final_link = first_filing.get("finalLink")
-            # Use 'fillingDate' from API, store in 'filing_date' variable
             filing_date = first_filing.get("fillingDate", "unknown_date").split(" ")[0]
             if final_link:
                 logging.info(f"Found filing link for date {filing_date}: {final_link}")
             else:
                 logging.error("No 'finalLink' found in the latest filing data. Exiting.")
-                exit()
+                sys.stderr.write("No 'finalLink' found in the latest filing data. Exiting.\n")
+                exit(1)
          else:
              logging.error(f"First filing data item is not a dictionary: {first_filing}. Exiting.")
-             exit()
+             sys.stderr.write(f"First filing data item is not a dictionary: {first_filing}. Exiting.\n")
+             exit(1)
     else:
         logging.error(f"No {filing_type} filings found for {symbol}. Response: {filings_data}. Exiting.")
-        exit()
+        sys.stderr.write(f"No {filing_type} filings found for {symbol}. Response: {filings_data}. Exiting.\n")
+        exit(1)
 
 
     # == Step 3: Process Document (Download, Extract, Embed, Store) ==
@@ -874,7 +893,7 @@ if __name__ == "__main__":
 
     index = None
     texts = []
-    force_reprocess = False # Set to True to always redownload/re-embed
+    force_reprocess = False 
 
     if not force_reprocess and os.path.exists(faiss_index_file) and os.path.exists(embeddings_pickle_file):
         logging.info("Found existing embeddings files. Loading them...")
@@ -886,44 +905,52 @@ if __name__ == "__main__":
             logging.info(f"Embeddings files not found or incomplete. Processing document '{final_link}' from scratch...")
 
         logging.info("Downloading HTML content...")
-        html_content = None
+        html_content_text = None # Renamed to avoid clash with html module
         try:
             headers = {"User-Agent": USER_AGENT}
             html_response = requests.get(final_link, headers=headers, timeout=REQUESTS_TIMEOUT)
             html_response.raise_for_status()
             html_response.encoding = html_response.apparent_encoding if html_response.apparent_encoding else 'utf-8'
-            html_content = html_response.text
-            logging.info(f"HTML content downloaded successfully ({len(html_content)} bytes). Encoding: {html_response.encoding}")
+            html_content_text = html_response.text
+            logging.info(f"HTML content downloaded successfully ({len(html_content_text)} bytes). Encoding: {html_response.encoding}")
         except requests.exceptions.RequestException as e:
             logging.error(f"Failed to download HTML content from {final_link}: {e}. Exiting.")
-            exit()
+            sys.stderr.write(f"Failed to download HTML content from {final_link}: {e}. Exiting.\n")
+            exit(1)
 
-        if html_content:
-            chunks = extract_text_and_chunk_by_tokens(html_content, token_limit=EMBEDDING_MODEL_TOKEN_LIMIT)
+        if html_content_text:
+            chunks = extract_text_and_chunk_by_tokens(html_content_text, token_limit=EMBEDDING_MODEL_TOKEN_LIMIT)
 
             if chunks:
-                # Use loaded index dimension if available, otherwise configured dimension
-                embedding_dimension_to_use = index.d if index else OPENAI_EMBEDDING_DIMENSION
+                embedding_dimension_to_use = OPENAI_EMBEDDING_DIMENSION # Default, will be updated if loaded from index
+                if index and hasattr(index, 'd'): # Check if index was loaded and has dimension
+                    embedding_dimension_to_use = index.d
+
                 embeddings_list = generate_openai_embeddings(chunks, OPENAI_EMBEDDING_MODEL, EMBEDDING_BATCH_SIZE)
 
                 if embeddings_list:
-                    # Pass the dimension confirmed/used by generation
-                    index, texts = store_embeddings(embeddings_list, len(embeddings_list[0]['embedding']),
+                    # Pass the dimension confirmed/used by generation if first time, or actual dim from embedding
+                    actual_embedding_dim = len(embeddings_list[0]['embedding'])
+                    index, texts = store_embeddings(embeddings_list, actual_embedding_dim,
                                                     faiss_index_file, embeddings_pickle_file)
                 else:
                     logging.error("OpenAI Embedding generation failed or produced no embeddings. Cannot proceed.")
-                    exit()
+                    sys.stderr.write("OpenAI Embedding generation failed or produced no embeddings. Cannot proceed.\n")
+                    exit(1)
             else:
                 logging.error("Text extraction and chunking failed. Cannot proceed.")
-                exit()
+                sys.stderr.write("Text extraction and chunking failed. Cannot proceed.\n")
+                exit(1)
         else:
              logging.error("HTML content is empty after download. Cannot proceed.")
-             exit()
+             sys.stderr.write("HTML content is empty after download. Cannot proceed.\n")
+             exit(1)
 
 
     if index is None or not texts:
         logging.error("Failed to load or generate embeddings and texts. Exiting.")
-        exit()
+        sys.stderr.write("Failed to load or generate embeddings and texts. Exiting.\n")
+        exit(1)
 
     # == Step 4: Define Queries and Search Context ==
     queries = [
@@ -966,10 +993,8 @@ if __name__ == "__main__":
     ]
 
 
-    # Search using OpenAI embeddings
     search_results = search_faiss(queries, index, texts, OPENAI_EMBEDDING_MODEL, FAISS_SEARCH_RESULTS)
 
-    # == Step 5: Prepare Queries for LLM and Get Answers ==
     query_contexts_for_llm = []
     for query, contexts in search_results.items():
         if contexts:
@@ -980,48 +1005,29 @@ if __name__ == "__main__":
 
     if not query_contexts_for_llm:
          logging.error("No queries have sufficient context after search. Cannot proceed with LLM analysis.")
-         exit()
+         sys.stderr.write("No queries have sufficient context after search. Cannot proceed with LLM analysis.\n")
+         exit(1)
 
     llm_results_list = ask_llm_batch(query_contexts_for_llm, OPENAI_LLM_MAX_WORKERS)
-
-
-
-
-    if not query_contexts_for_llm:
-         logging.error("No queries have sufficient context after search. Cannot proceed with LLM analysis.")
-         exit()
     
-    # Call the batch LLM function (results may be out of order)    
     logging.info("Re-ordering LLM results to match original query sequence...")
-    # Create a map from the query text to its original index
     query_order_map = {query: index for index, query in enumerate(queries)}
     
-    # Define a sort key function. It looks up the original index using the 'Question' field.
-    # Use float('inf') as a fallback for any results that might somehow miss the 'Question' key,
-    # placing them at the end.
     def sort_key(result_item):
         question = result_item.get("Question")
         return query_order_map.get(question, float('inf'))
     
-    # Sort the list *in-place* based on the original query order
     llm_results_list.sort(key=sort_key)
     logging.info("LLM results re-ordered successfully.")
-    # --- END OF ADDED SECTION ---
     
-    
-    # == Step 5.5: Transform results list into a dictionary ==
-    # Now llm_results_list is guaranteed to be in the original order
     logging.info("Transforming LLM results list into a dictionary...")
     llm_results_dict = {}
     llm_results_dict['filing_link'] = final_link
     llm_results_dict['company_symbol'] = symbol
     llm_results_dict['filing_date'] = filing_date
-    llm_results_dict['analysis_results'] = llm_results_list # Store the now ORDERED list
+    llm_results_dict['analysis_results'] = llm_results_list 
 
-# The HTML generation loop will now iterate through analysis_results in the correct order.
-
-    # == Step 5.6: Save LLM Results Dictionary as JSON ==
-    json_output_file = os.path.join(output_dir, f"{symbol}_{filing_date}.json")
+    json_output_file = os.path.join(output_dir, f"{symbol}_{filing_date}_{filing_type}.json") # Added filing_type for uniqueness
     logging.info(f"Saving detailed LLM analysis results to {json_output_file}...")
     try:
         with open(json_output_file, 'w', encoding='utf-8') as f:
@@ -1033,18 +1039,16 @@ if __name__ == "__main__":
         logging.error(f"Failed to serialize results dictionary to JSON: {e}")
 
 
-    # == Step 6: Generate and Save HTML Output ==
-    output_file = os.path.join(output_dir, f"{symbol}_{filing_date}.html")
+    output_file = os.path.join(output_dir, f"{symbol}_{filing_date}_{filing_type}.html") # Added filing_type for uniqueness
     logging.info(f"Generating HTML analysis report to {output_file}...")
 
-    # --- HTML Generation (Using Recursive Formatter) ---
     html_content_head = """
     <!DOCTYPE html>
     <html lang="en">
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Financial Analysis Report - {symbol}</title>
+        <title>Financial Analysis Report - {symbol} ({filing_type_upper})</title>
         <style>
             body {{ font-family: sans-serif; line-height: 1.6; padding: 20px; max-width: 1000px; margin: auto; }}
             h1 {{ color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px; }}
@@ -1054,17 +1058,18 @@ if __name__ == "__main__":
             .analysis-item {{ border: 1px solid #ddd; margin-bottom: 20px; padding: 15px; border-radius: 5px; background-color: #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }}
             .analysis-item h3 {{ margin-top: 0; color: #2980b9; }}
             .analysis-item .status-failed {{ color: #c0392b; font-weight: bold; }}
-            .analysis-item .status-warning {{ color: #f39c12; font-weight: bold; }} /* For structure/parsing issues */
+            .analysis-item .status-warning {{ color: #f39c12; font-weight: bold; }}
             .analysis-item .error-message {{ background-color: #fcebea; border: 1px solid #e74c3c; color: #c0392b; padding: 10px; margin-top: 10px; border-radius: 3px; font-family: monospace; font-size: 0.9em; white-space: pre-wrap; word-wrap: break-word;}}
             .analysis-item .warning-message {{ background-color: #fff9e6; border: 1px solid #f39c12; color: #b07d2a; padding: 10px; margin-top: 10px; border-radius: 3px; font-size: 0.9em; white-space: pre-wrap; word-wrap: break-word;}}
             .classification {{ font-weight: bold; padding: 3px 8px; border-radius: 4px; color: white; display: inline-block; margin-left: 10px; font-size: 0.9em;}}
             .classification-positive {{ background-color: #27ae60; }}
             .classification-negative {{ background-color: #e74c3c; }}
-            .classification-severe-negative {{ background-color: #c0392b; }} /* Darker red for severe */
+            .classification-severe-negative {{ background-color: #c0392b; }}
             .classification-neutral {{ background-color: #7f8c8d; }}
             .classification-unknown, .classification-classification-not-found,
             .classification-parsing-error, .classification-processing-error,
-            .classification-missing-content, .classification-invalid-structure {{ background-color: #f39c12; color: #333; }} /* Orange for errors/unknowns */
+            .classification-missing-content, .classification-invalid-structure, 
+            .classification-missing-analysis {{ background-color: #f39c12; color: #333; }}
             .analysis-text {{ margin-top: 10px; background-color: #fdfefe; padding: 10px; border-left: 3px solid #3498db; }}
             .analysis-text p {{ margin: 5px 0 10px 0; }}
             .analysis-text ul {{ margin: 10px 0 10px 0; padding-left: 20px; list-style-type: disc; }}
@@ -1075,27 +1080,27 @@ if __name__ == "__main__":
         </style>
     </head>
     <body>
-        <h1>Financial Analysis Report: {symbol}</h1>
+        <h1>Financial Analysis Report: {symbol} ({filing_type_upper})</h1>
         <div class="meta-info">
             <p><strong>Company Ticker:</strong> {symbol}</p>
-            <p><strong>Filing Type:</strong> {filing_type}</p>
-            <p><strong>Filing Date:</strong> {filing_date}</p> <!-- Corrected key -->
-            <p><strong>Source Document:</strong> <a href="{filing_link}" target="_blank" rel="noopener noreferrer">Link to Filing</a></p>
+            <p><strong>Filing Type:</strong> {filing_type_upper}</p>
+            <p><strong>Filing Date:</strong> {filing_date_val}</p>
+            <p><strong>Source Document:</strong> <a href="{filing_link_val}" target="_blank" rel="noopener noreferrer">Link to Filing</a></p>
         </div>
 
         <h2>Analysis Results</h2>
     """.format(
-        symbol=html.escape(llm_results_dict.get('company_symbol', 'N/A')), # Corrected key
-        filing_type=html.escape(filing_type),
-        filing_date=html.escape(llm_results_dict.get('filing_date', 'N/A')), # Corrected key
-        filing_link=html.escape(llm_results_dict.get('filing_link') or '#')
+        symbol=html.escape(llm_results_dict.get('company_symbol', 'N/A')),
+        filing_type_upper=html.escape(filing_type.upper()),
+        filing_date_val=html.escape(llm_results_dict.get('filing_date', 'N/A')),
+        filing_link_val=html.escape(llm_results_dict.get('filing_link') or '#')
     )
 
-    html_body_content = "" # Initialize body content string
+    html_body_content = "" 
     for result in llm_results_dict.get('analysis_results', []):
         question = result.get("Question", "Unknown Question")
         status = result.get("status", "Unknown Status")
-        validation_passed = result.get("validation_passed", False) # Check if LLM output had correct structure
+        validation_passed = result.get("validation_passed", False)
 
         html_body_content += '<div class="analysis-item">\n'
         html_body_content += f'    <h3>{html.escape(question)}</h3>\n'
@@ -1108,21 +1113,20 @@ if __name__ == "__main__":
             warning_message = None
 
             if not validation_passed:
-                logging.warning(f"LLM response for '{question}' passed status 'Success' but failed structure validation (missing 'analysis' or 'classification'). Raw: {answer_json_string[:200]}...")
+                logging.warning(f"LLM response for '{question}' passed status 'Success' but failed structure validation (missing 'analysis' or 'classification'). Raw: {str(answer_json_string)[:200]}...")
                 warning_message = "LLM response structure was invalid (missing 'analysis' or 'classification' key)."
-                classification = "Invalid Structure" # More specific than Unknown
+                classification = "Invalid Structure" 
                 classification_css_class = "classification-invalid-structure"
-                # Try to display raw JSON if structure is wrong
                 if answer_json_string:
-                    analysis_html_output = f"<p>Raw LLM response:</p><pre><code>{html.escape(answer_json_string)}</code></pre>"
+                    analysis_html_output = f"<p>Raw LLM response:</p><pre><code>{html.escape(str(answer_json_string))}</code></pre>"
                 else:
                     analysis_html_output = "<p><em>No answer content received from LLM.</em></p>"
 
-            elif answer_json_string: # Validation passed AND content exists
+            elif answer_json_string: 
                 try:
-                    parsed_answer = json.loads(answer_json_string) # Already validated, but parse again for safety
+                    parsed_answer = json.loads(answer_json_string) 
                     analysis_value = parsed_answer.get("analysis")
-                    classification = parsed_answer.get("classification", "Classification not found") # Should exist due to validation
+                    classification = parsed_answer.get("classification", "Classification not found")
 
                     safe_classification = html.escape(str(classification)).lower().replace(" ", "-")
                     classification_css_class = f"classification-{safe_classification}"
@@ -1137,53 +1141,48 @@ if __name__ == "__main__":
                     else:
                          analysis_html_output = "<p><em>'analysis' field was null in the JSON response.</em></p>"
                          warning_message = "'analysis' key was present but its value was null."
-                         if classification == "Classification not found": # Update classification if analysis is null
+                         if classification == "Classification not found": 
                               classification = "Missing Analysis"
-                              classification_css_class = "classification-missing-analysis" # Requires CSS rule
+                              classification_css_class = "classification-missing-analysis"
 
-                except json.JSONDecodeError: # Should be rare now due to initial validation, but handle defensively
-                    logging.error(f"JSONDecodeError during final HTML generation for '{question}' despite initial validation! Raw: {answer_json_string[:200]}...")
-                    analysis_html_output = f"<p><strong><em>Could not parse LLM JSON response during HTML generation.</em></strong></p><p>Raw response (truncated):<br><pre><code>{html.escape(answer_json_string[:300])}...</code></pre></p>"
+                except json.JSONDecodeError: 
+                    logging.error(f"JSONDecodeError during final HTML generation for '{question}' despite initial validation! Raw: {str(answer_json_string)[:200]}...")
+                    analysis_html_output = f"<p><strong><em>Could not parse LLM JSON response during HTML generation.</em></strong></p><p>Raw response (truncated):<br><pre><code>{html.escape(str(answer_json_string)[:300])}...</code></pre></p>"
                     classification = "Parsing Error"
                     classification_css_class = "classification-parsing-error"
-                except Exception as e: # Catch errors in recursive formatting
+                except Exception as e: 
                     logging.error(f"Error formatting analysis data for '{question}': {e}", exc_info=True)
                     analysis_html_output = f"<p><strong><em>Error formatting analysis data for HTML:</strong> {html.escape(str(e))}</em></p>"
                     classification = "Processing Error"
                     classification_css_class = "classification-processing-error"
-            else: # Success status but empty answer string
+            else: 
                  analysis_html_output = "<p><em>No answer content received from LLM (empty JSON string).</em></p>"
                  classification = "Missing Content"
                  classification_css_class = "classification-missing-content"
 
-            # Add Status/Classification line (use warning status if needed)
             status_html = 'Success'
             if warning_message:
                 status_html = '<span class="status-warning">Success (with warnings)</span>'
 
             html_body_content += f'    <p><span class="classification {classification_css_class}">{html.escape(str(classification))}</span></p>\n'
 
-            # Add warning message box if applicable
             if warning_message:
                  html_body_content += f'    <div class="warning-message">{html.escape(warning_message)}</div>\n'
 
-            # Add the formatted analysis content
             html_body_content += f'    <div class="analysis-text">\n{analysis_html_output}\n    </div>\n'
 
-        else: # Failed status
+        else: 
             error_message = result.get("error", "No error details provided.")
             html_body_content += f'    <p><strong class="status-failed">Status: Failed</strong></p>\n'
             html_body_content += f'    <div class="error-message"><pre>{html.escape(str(error_message))}</pre></div>\n'
 
-        # --- Correct placement of the closing div ---
-        html_body_content += '</div>\n' # Close analysis-item div
+        html_body_content += '</div>\n'
 
     html_content_foot = """
     </body>
     </html>
     """
 
-    # Combine head, body, foot
     final_html_content = html_content_head + html_body_content + html_content_foot
 
     try:
@@ -1193,7 +1192,6 @@ if __name__ == "__main__":
     except IOError as e:
         logging.error(f"Failed to write results to HTML file {output_file}: {e}")
 
-    # == Step 7: Print Summary ==
     logging.info("\n--- Analysis Summary ---")
     total_llm_tokens_used = 0
     successful_queries = 0
@@ -1219,4 +1217,3 @@ if __name__ == "__main__":
 
     overall_end_time = time.time()
     logging.info(f"--- Total Execution Time: {overall_end_time - overall_start_time:.2f} seconds ---")
-
