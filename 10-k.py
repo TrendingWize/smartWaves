@@ -809,10 +809,6 @@ if __name__ == "__main__":
     logging.info(f"--- Starting Analysis for Ticker: {symbol} using OpenAI Embeddings ({OPENAI_EMBEDDING_MODEL}) ---")
     overall_start_time = time.time()
 
-    # Check if tiktoken loaded correctly before proceeding
-    if not tiktoken_encoding:
-        pass
-
     # Check if the company is an ADR by examining the profile data
     # == Step 1: Fetch Company Profile ==
     logging.info("Fetching company profile...")
