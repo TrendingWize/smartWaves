@@ -82,7 +82,6 @@ def tradingview_chart(symbol: str, interval: str = "D",
                       theme: str = "light", height: int = 750,
                       width: int | None = None, autosize: bool = True):
     props = {
-        "autosize": autosize,
         "symbol": symbol,
         "interval": interval,
         "theme": theme,
