@@ -79,7 +79,7 @@ def ask_gemini(img_path: str, prompt: str) -> str:
 # 4. TradingView Advanced-Chart helper
 # ─────────────────────────────────────────────────────────────────────────────
 def tradingview_chart(symbol: str, interval: str = "D",
-                      theme: str = "light", height: int = 550,
+                      theme: str = "light", height: int = 750,
                       width: int | None = None, autosize: bool = True):
     props = {
         "autosize": autosize,
@@ -115,9 +115,8 @@ date_from = col_from.date_input("From", today - dt.timedelta(days=365))
 date_to   = col_to.date_input("To",   today)
 frame  = col_frame.selectbox("Indicator frame", ["Daily","Weekly","Monthly"])
 tv_int = col_tv.selectbox("TV interval", ["1","15","30","60","D","W","M"], index=4)
-
+height=750
 theme   = st.radio("Theme", ["auto","light","dark"], horizontal=True)
-height  = st.slider("Chart height (px)", 400, 1000, 600)
 autosz  = st.checkbox("Autosize width", value=True)
 run_btn = st.button("🚀 Generate")
 
