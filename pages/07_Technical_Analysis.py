@@ -91,6 +91,7 @@ def tradingview_chart(symbol: str, interval: str = "D",
         "timezone": "Etc/UTC",
         "allow_symbol_change": True,
         "support_host": "https://www.tradingview.com",
+         autosize=False, 
     }
     outer_style = f"height:{height}px;" + (f"width:{width}px;" if (not autosize and width) else "")
     html_code = f"""
