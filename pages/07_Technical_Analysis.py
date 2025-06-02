@@ -153,29 +153,29 @@ if run_btn:
         raw = get_ohlcv(symbol, date_from.isoformat(), date_to.isoformat())
         df  = add_indicators(resample(raw, frame))
 
-    st.subheader("🔹 Interactive Chart")
-    # choose exchange, then fuse with ticker
-exchange = st.selectbox("Exchange", ["NASDAQ", "NYSE", "AMEX"], index=0)
-tv_symbol = f"{exchange}:{symbol}"
+        st.subheader("🔹 Interactive Chart")
 
-st.subheader("🔹 Interactive Chart")
-tradingview_chart(
-    symbol=tv_symbol,          # <-- correct keyword
-    interval=tv_int,
-    theme=theme,
-    height=height,
-    autosize=autosz,
-    width=None if autosz else 800,
-)
+    # exchange selector and chart
+    exchange   = st.selectbox("Exchange", ["NASDAQ", "NYSE", "AMEX"], index=0)
+    tv_symbol  = f"{exchange}:{symbol}"
 
+    tradingview_chart(
+        symbol=tv_symbol,
+        interval=tv_int,
+        theme=theme,
+        height=height,
+        autosize=autosz,
+        width=None if autosz else 800,
+    )
 
-    # Gemini commentary
+    # Gemini commentary (static composite for AI)
     comp = save_composite_chart(df, symbol, frame)
     prompt = textwrap.dedent(f"""
         You are a professional market technician.
         Analyse this {frame.lower()} composite chart of {symbol} (log close, SMAs, volume, MACD, RSI).
-        Discuss trend, momentum, support/resistance. Give price targets for +30, +60, +252 trading days (bullish/base/bearish).
+        Discuss trend, momentum, support/resistance. Provide price targets for +30, +60, +252 trading days (bullish / base / bearish).
     """)
     with st.spinner("Gemini is thinking …"):
         st.subheader("🧠 Gemini Commentary")
         st.markdown(ask_gemini(comp, prompt))
+
