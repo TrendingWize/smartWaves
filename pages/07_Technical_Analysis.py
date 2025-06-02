@@ -139,14 +139,6 @@ default_from  = today - dt.timedelta(days=365)
 # ── all inputs in one horizontal row ───────────────────────────────────────
 col_ticker, col_from, col_to, col_frame, col_tvint = st.columns([2, 2, 2, 2, 2])
 
-symbol      = col_ticker.text_input("Ticker", value="AAPL").upper().strip()
-date_from   = col_from.date_input("From", default_from)
-date_to     = col_to.date_input("To",   today)
-
-frame       = col_frame.selectbox("Indicator frame", ["Daily", "Weekly", "Monthly"])
-tv_int      = col_tvint.selectbox("TV interval", ["1", "15", "30", "60", "D", "W", "M"], index=4)
-
-
 frame   = st.selectbox("Indicator frame", ["Daily","Weekly","Monthly"])
 tv_int  = st.selectbox("TV interval", ["1","15","30","60","D","W","M"], index=4)
 theme   = st.radio("Theme", ["auto","light","dark"], horizontal=True)
