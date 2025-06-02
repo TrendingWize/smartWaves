@@ -9,7 +9,7 @@ load_global_css()
 
 st.title("🧠 AI-Powered Financial Analysis")
 
-if not st.session_state.logged_in:
+if not st.session_state.get("logged_in", False):
     st.warning("?? Please log in to access the Financial Dashboard.")
     if st.button("?? Go to Login"):
         st.switch_page("pages/97_Login.py")
