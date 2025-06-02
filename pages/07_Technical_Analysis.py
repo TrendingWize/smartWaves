@@ -48,11 +48,11 @@ def get_ohlcv(ticker: str, date_from: str, date_to: str) -> pd.DataFrame:
     df = pd.DataFrame(rows).rename(columns=str.lower)
 
     # ---- harmonise column names ----------------------------------------
-    if "close" in df.columns and "close" not in df.columns:
-        df["price"] = df["close"]
+    #if "close" in df.columns and "close" not in df.columns:
+    #    df["close"] = df["close"]
 
     # if high/low/open missing, synthesize from close so indicators work
-    for col in ("open", "high", "low"):
+    for col in ("open", "high", "low", "close"):
         if col not in df.columns:
             df[col] = df["close"]
 
@@ -74,7 +74,7 @@ def resample(df: pd.DataFrame, frame: str) -> pd.DataFrame:
     else:
         rule = "W-FRI" if frame == "Weekly" else "M"
         agg  = {"open": "first", "high": "max", "low": "min",
-                "price": "last", "volume": "sum"}
+                "close": "last", "volume": "sum"}
         out = df.resample(rule).agg(agg).dropna()
     return out.rename(columns=str.title)  # Open/High/…
 
@@ -83,11 +83,11 @@ def resample(df: pd.DataFrame, frame: str) -> pd.DataFrame:
 # 2. Indicators
 # ─────────────────────────────────────────────────────────────────────────────
 def add_indicators(df: pd.DataFrame) -> pd.DataFrame:
-    df["SMA20"]  = ta.sma(df["price"], 20)
-    df["SMA50"]  = ta.sma(df["price"], 50)
-    df["SMA100"] = ta.sma(df["price"], 100)
-    df = pd.concat([df, ta.macd(df["price"])], axis=1)
-    df["RSI"]    = ta.rsi(df["price"], 14)
+    df["SMA20"]  = ta.sma(df["close"], 20)
+    df["SMA50"]  = ta.sma(df["close"], 50)
+    df["SMA100"] = ta.sma(df["close"], 100)
+    df = pd.concat([df, ta.macd(df["close"])], axis=1)
+    df["RSI"]    = ta.rsi(df["close"], 14)
     return df
 
 
@@ -100,7 +100,7 @@ def save_composite_chart(df: pd.DataFrame, ticker: str, frame: str) -> str:
 
     ax_price = fig.add_subplot(gs[0])
     ax_price.set_yscale("log")
-    ax_price.plot(df.index, df["price"], label="price")
+    ax_price.plot(df.index, df["close"], label="close")
     ax_price.plot(df.index, df["SMA20"],  label="SMA 20")
     ax_price.plot(df.index, df["SMA50"],  label="SMA 50")
     ax_price.plot(df.index, df["SMA100"], label="SMA 100")
