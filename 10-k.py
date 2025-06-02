@@ -21,6 +21,8 @@ import nltk
 import warnings
 from bs4 import XMLParsedAsHTMLWarning
 
+tiktoken_encoding = None  # global default
+
 # Suppress XML parsing warning
 warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
 
