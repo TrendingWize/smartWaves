@@ -145,6 +145,8 @@ date_to     = col_to.date_input("To",   today)
 frame       = col_frame.selectbox("Indicator frame", ["Daily", "Weekly", "Monthly"])
 tv_int      = col_tvint.selectbox("TV interval", ["1", "15", "30", "60", "D", "W", "M"], index=4)
 run_btn = st.button("🚀 Generate")
+autosz  = st.checkbox("Autosize width", value=True)
+
 
 if run_btn:
     if date_from >= date_to:
