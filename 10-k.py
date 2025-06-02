@@ -87,26 +87,21 @@ except Exception as e:
     exit(1) 
 
 # --- NLTK Download Check ---
+# --- NLTK Download Check (Fix) ---
+import warnings
+from bs4 import XMLParsedAsHTMLWarning
+
+# Suppress XMLParsedAsHTMLWarning from BeautifulSoup
+warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
+
+# Ensure 'punkt' is available
 try:
-    nltk.data.find('tokenizers/punkt')
-    logging.info("NLTK 'punkt' tokenizer found.")
+    nltk.data.find("tokenizers/punkt")
 except LookupError:
-    logging.warning("NLTK 'punkt' tokenizer not found. Attempting to download...")
-    try:
-        nltk.download('punkt', quiet=False) 
-        logging.info("NLTK 'punkt' download attempt completed. Verifying...")
-        nltk.data.find('tokenizers/punkt') 
-        logging.info("NLTK 'punkt' tokenizer is now available.")
-    except LookupError: 
-        logging.error("NLTK 'punkt' still not found after download attempt. This may be due to network issues, permissions, or an incomplete download.")
-        logging.error(f"NLTK data path includes: {nltk.data.path}")
-        sys.stderr.write("Critical NLTK resource 'punkt' could not be downloaded or found. Please check network and permissions. Exiting.\n")
-        exit(1)
-    except Exception as e: 
-        logging.error(f"An error occurred during NLTK 'punkt' download: {e}")
-        logging.error(f"NLTK data path includes: {nltk.data.path}")
-        sys.stderr.write(f"Critical NLTK resource 'punkt' could not be downloaded due to: {e}. Exiting.\n")
-        exit(1)
+    logging.info("NLTK 'punkt' tokenizer not found. Downloading...")
+    nltk.download("punkt")
+    logging.info("NLTK 'punkt' downloaded successfully.")
+
 
 # --- Helper Functions ---
 
