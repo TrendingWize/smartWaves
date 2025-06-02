@@ -271,5 +271,36 @@ async def main() -> None:
     log.info("DONE in %.1fs", dur)
     print(json.dumps(meta))
 
+# ------------------------------------------------------------------
+# 1)  Utility: wrap a fragment in a colored <span>
+# ------------------------------------------------------------------
+def color(text: str, hex_color: str) -> str:
+    """Return HTML that renders `text` in `hex_color` inside Markdown."""
+    return f'<span style="color:{hex_color}">{text}</span>'
+
+# ------------------------------------------------------------------
+# 2)  Assemble the report
+# ------------------------------------------------------------------
+header = "# **SEC Filing Analysis**\n"      # original header
+header += "\n"                              # <-- blank line right after H1
+
+sections = [
+    ("Summary",    summary_text,   "#008000"),  # green
+    ("Key Risks",  risk_text,      "#d00000"),  # red
+    ("Opportunities", opp_text,    "#0057e7"),  # blue
+]
+
+# Build the body with inline-colored spans
+body_lines = []
+for title, txt, hex_c in sections:
+    body_lines.append(f"## {title}\n")
+    # each bullet gets colored
+    for line in txt.splitlines():
+        if line.strip():
+            body_lines.append(f"- {color(line.strip(), hex_c)}")
+    body_lines.append("")         # blank line between sections
+
+report_md = header + "\n".join(body_lines)
+
 if __name__ == "__main__":
     asyncio.run(main())
