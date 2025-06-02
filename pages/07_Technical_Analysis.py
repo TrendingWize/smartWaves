@@ -48,8 +48,8 @@ def get_ohlcv(ticker: str, date_from: str, date_to: str) -> pd.DataFrame:
     df = pd.DataFrame(rows).rename(columns=str.lower)
 
     # ---- harmonise column names ----------------------------------------
-    if "price" in df.columns and "close" not in df.columns:
-        df["close"] = df["price"]
+    if "close" in df.columns and "close" not in df.columns:
+        df["close"] = df["close"]
 
     # if high/low/open missing, synthesize from close so indicators work
     for col in ("open", "high", "low"):
