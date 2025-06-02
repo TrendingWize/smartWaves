@@ -85,22 +85,7 @@ except Exception as e:
     sys.stderr.write(f"Failed to initialize OpenAI client: {e}\n")
     exit(1)
 
-# --- Initialize Tiktoken Encoder ---
-try:
-    # Get the encoding for the specific embedding model
-    tiktoken_encoding = tiktoken.encoding_for_model(OPENAI_EMBEDDING_MODEL)
-    logging.info(f"Tiktoken encoder loaded successfully for model: {OPENAI_EMBEDDING_MODEL}")
-except Exception as e:
-    logging.error(f"Could not load tiktoken encoding for model {OPENAI_EMBEDDING_MODEL}: {e}")
-    logging.error("Tiktoken is required for accurate chunking. Please install it (`pip install tiktoken`) and ensure the model name is correct.")
-    sys.stderr.write(f"Could not load tiktoken encoding for model {OPENAI_EMBEDDING_MODEL}: {e}. Tiktoken is required.\n")
-    tiktoken_encoding = None 
-    exit(1) 
 
-# --- NLTK Download Check ---
-# --- NLTK Download Check (Fix) ---
-import warnings
-from bs4 import XMLParsedAsHTMLWarning
 
 # Suppress XMLParsedAsHTMLWarning from BeautifulSoup
 warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
