@@ -119,7 +119,7 @@ if symbol and FMP_API_KEY and GOOGLE_API_KEY:
             "and provide price targets for the next 30, 60 and 252 trading days "
             "under bullish, base and bearish scenarios."
         )
-        with st.spinner("Analyzing with Gemini Vision..."):
+        with st.spinner("Analyzing with AI ..."):
             summary = ask_gemini(chart_path, prompt)
             st.subheader("🧠 Gemini Commentary")
             st.markdown(summary)
