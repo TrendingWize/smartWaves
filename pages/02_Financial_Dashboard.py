@@ -21,11 +21,11 @@ st.title("📊 Financial Dashboard")
 if check_concurrent_login():
     st.stop()
 
-if not st.session_state.logged_in:
-    st.warning("🔒 Please log in to access the Financial Dashboard.")
-    if st.button("🔑 Go to Login"):
-        st.switch_page("pages/97_Login.py")
-    st.stop()
+#if not st.session_state.logged_in:
+    #st.warning("🔒 Please log in to access the Financial Dashboard.")
+    #if st.button("🔑 Go to Login"):
+     #   st.switch_page("pages/97_Login.py")
+    #st.stop()
 
 
 
