@@ -154,7 +154,7 @@ if run_btn:
         df  = add_indicators(resample(raw, frame))
 
     st.subheader("🔹 Interactive Chart")
-    tradingview_chart(exchange = st.selectbox("Exchange", ["NASDAQ", "NYSE", "AMEX"]),
+    tradingview_chart(exchange = st.selectbox(#"Exchange", ["NASDAQ", "NYSE", "AMEX"]),
     tv_symbol = f"{exchange}:{symbol}",
                       interval=tv_int,
                       theme=theme,
