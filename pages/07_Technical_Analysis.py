@@ -147,6 +147,7 @@ tv_int      = col_tvint.selectbox("TV interval", ["1", "15", "30", "60", "D", "W
 run_btn = st.button("🚀 Generate")
 autosz  = st.checkbox("Autosize width", value=True)
 theme   = st.radio("Theme", ["auto","light","dark"], horizontal=True)
+height  = 550
 
 
 if run_btn:
