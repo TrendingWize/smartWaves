@@ -89,7 +89,7 @@ def ask_gemini(img_path: str, prompt: str) -> str:
 def tradingview_chart(symbol: str,
                       interval: str = "D",
                       theme: str = "light",
-                      height: int = 1000,
+                      height: int = 550,
                       width: int | None = None,
                       autosize: bool = False):
     """Embed TradingView Advanced Chart.  
