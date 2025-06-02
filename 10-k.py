@@ -14,14 +14,12 @@ from dotenv import load_dotenv
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import nltk
 import html # For escaping HTML characters in the output and recursive formatting
-import tiktoken # <-- Added for token counting
+ # <-- Added for token counting
 import streamlit as st
 import sys # <-- Added for sys.stderr
 import nltk
 import warnings
 from bs4 import XMLParsedAsHTMLWarning
-
-tiktoken_encoding = None  # global default
 
 # Suppress XML parsing warning
 warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
