@@ -23,13 +23,15 @@ from bs4 import XMLParsedAsHTMLWarning
 
 # Suppress XML parsing warning
 warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
-
-# Ensure nltk 'punkt' tokenizer is available
+# Ensure 'punkt' tokenizer is available
 try:
     nltk.data.find("tokenizers/punkt")
 except LookupError:
-    nltk.download("punkt", quiet=True)
-
+    import os
+    nltk_data_path = "/tmp/nltk_data"
+    os.makedirs(nltk_data_path, exist_ok=True)
+    nltk.download("punkt", download_dir=nltk_data_path)
+    nltk.data.path.append(nltk_data_path)
 # --- Configuration (Keep variable names and values) ---
 symbol = os.environ.get("TICKER_SYMBOL")
 if not symbol:
