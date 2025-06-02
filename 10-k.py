@@ -24,7 +24,7 @@ import asyncio, json, logging, os, pickle, re, time
 from hashlib import blake2s
 from pathlib import Path
 from typing import Any, List, Tuple
-import streamli as st
+import streamlit as st
 import numpy as np
 import faiss, httpx, tiktoken, nltk, html
 from bs4 import BeautifulSoup
