@@ -18,7 +18,7 @@ from typing import List, Tuple
 
 import httpx, markdown2, nltk, numpy as np, tiktoken
 from bs4 import BeautifulSoup, XMLParsedAsHTMLWarning
-from nltk.d
+from nltk.data import find as _nltk_find
 
 import streamlit as st
 # ── CONFIG ────────────────────────────────────────────────────────────────
