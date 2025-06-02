@@ -81,8 +81,7 @@ except Exception as e:
     exit() # Exit if tiktoken fails, as chunking relies on it
 
 # --- NLTK Download Check ---
-try:
-    nltk.data.find('tokenizers/punkt')
+
 
 # --- Helper Functions ---
 
