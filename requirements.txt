@@ -10,9 +10,7 @@ faiss-cpu>=1.7.4
 python-dotenv>=1.0.1
 pandas>=2.2.2
 numpy==1.24.4
-nltk>=3.8.1
 plotly>=5.21.0
-lxml>=5.1.0
 beautifulsoup4>=4.12.3
 requests>=2.31.0
 streamlit-navigation-bar>=0.0.6
@@ -21,3 +19,5 @@ pandas_ta
 matplotlib
 google-generativeai
 httpx[http2]>=0.27.0
+lxml>=5.2
+nltk>=3.8
