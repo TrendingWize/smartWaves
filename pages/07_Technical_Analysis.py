@@ -80,7 +80,7 @@ def ask_gemini(img_path: str, prompt: str) -> str:
 # ─────────────────────────────────────────────────────────────────────────────
 def tradingview_chart(symbol: str, interval: str = "D",
                       theme: str = "light", height: int = 550,
-                      width: int | None = None, autosize: bool = True):
+                      width: int | None = None, autosize: bool = False):
     props = {
         "autosize": autosize,
         "symbol": symbol,
