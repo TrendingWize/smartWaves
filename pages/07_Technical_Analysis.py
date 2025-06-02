@@ -27,23 +27,45 @@ plt.rcParams["axes.titlepad"] = 6
 @st.cache_data(ttl=3_600)
 def get_ohlcv(ticker: str, date_from: str, date_to: str) -> pd.DataFrame:
     url = (
-        f"https://financialmodelingprep.com/stable/historical-price-eod/light/"
+        f"https://financialmodelingprep.com/api/v3/historical-price-full/"
         f"{ticker}?apikey={FMP_API_KEY}&from={date_from}&to={date_to}"
     )
-    raw = requests.get(url, timeout=30).json().get("historical", [])
-    if not raw:
-        raise ValueError(f"No data for {ticker} between {date_from} and {date_to}")
+    data = requests.get(url, timeout=30).json()
 
-    df = (pd.DataFrame(raw)
-            .rename(columns=str.lower)
-            .assign(date=lambda d: pd.to_datetime(d["date"]))
-            .set_index("date")
-            .sort_index())
+    # ---- normalise to a list of dicts -----------------------------------
+    if isinstance(data, dict):
+        rows = data.get("historical", [])
+    elif isinstance(data, list):
+        rows = data
+    else:
+        rows = []
 
-    if "adjclose" in df and not df["adjclose"].isna().all():
-        df["price"] = df["adjclose"]
+    if not rows:
+        raise ValueError(
+            f"No price records returned for {ticker} between {date_from} and {date_to}"
+        )
 
-    return df[["open", "high", "low", "price", "volume"]]
+    df = pd.DataFrame(rows).rename(columns=str.lower)
+
+    # ---- harmonise column names ----------------------------------------
+    if "price" in df.columns and "close" not in df.columns:
+        df["close"] = df["price"]
+
+    # if high/low/open missing, synthesize from close so indicators work
+    for col in ("open", "high", "low"):
+        if col not in df.columns:
+            df[col] = df["close"]
+
+    if "volume" not in df.columns:
+        df["volume"] = 0
+
+    df = (
+        df.assign(date=lambda d: pd.to_datetime(d["date"]))
+          .set_index("date")
+          .sort_index()
+    )
+
+    return df[["open", "high", "low", "close", "volume"]]
 
 
 def resample(df: pd.DataFrame, frame: str) -> pd.DataFrame:
