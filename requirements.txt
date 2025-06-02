@@ -20,3 +20,4 @@ tenacity>=8.2.3
 pandas_ta
 matplotlib
 google-generativeai
+httpx[http2]>=0.27.0
