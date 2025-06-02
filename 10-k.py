@@ -75,7 +75,18 @@ log = logging.getLogger("10-k")
 # ---------------------------------------------------------------------------
 # Helpers – HTTP
 # ---------------------------------------------------------------------------
-HEADERS = {"User-Agent": USER_AGENT, "Accept": "application/json"}
+# ------------------------------------------------------------------
+SEC_HEADERS = {
+    # REQUIRED – put your project name and a contact e-mail or phone
+    "User-Agent": (
+        "SmartWave/1.0 (+https://smartwave.example; contact@smartwave.example)"
+    ),
+    # Nice to have – keeps responses small
+    "Accept-Encoding": "gzip, deflate",
+    # Helps a little with some edge-cache rules
+    "Accept-Language": "en-US,en;q=0.9",
+}
+# ------------------------------------------------------------------
 
 async def _fetch_json(client: httpx.AsyncClient, url: str, **kw) -> Any:
     try:
@@ -86,15 +97,11 @@ async def _fetch_json(client: httpx.AsyncClient, url: str, **kw) -> Any:
         log.error("GET %s failed: %s", url, e)
         raise
 
-async def _fetch_text(client: httpx.AsyncClient, url: str, **kw) -> str:
-    try:
-        r = await client.get(url, headers={"User-Agent": USER_AGENT}, timeout=REQUEST_TIMEOUT, **kw)
-        r.raise_for_status()
-        r.encoding = r.apparent_encoding or "utf-8"
-        return r.text
-    except Exception as e:
-        log.error("GET %s failed: %s", url, e)
-        raise
+async def _fetch_text(client: httpx.AsyncClient, url: str) -> str:
+    r = await client.get(url, headers=SEC_HEADERS, timeout=REQUEST_TIMEOUT)
+    r.raise_for_status()
+    return r.text
+
 
 # ---------------------------------------------------------------------------
 # Caching helpers – based on ETag or hash of body
