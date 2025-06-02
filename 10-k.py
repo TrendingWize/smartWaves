@@ -83,7 +83,7 @@ except Exception as e:
 # --- NLTK Download Check ---
 try:
     nltk.data.find('tokenizers/punkt')
-except nltk.downloader.DownloadError:
+except nltk.downloader:
     logging.info("NLTK 'punkt' tokenizer not found. Downloading...")
     nltk.download('punkt')
     logging.info("NLTK 'punkt' downloaded.")
