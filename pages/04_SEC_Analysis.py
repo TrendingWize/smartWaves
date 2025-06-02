@@ -13,7 +13,7 @@ from utils import (
     logout_user,
     load_global_css,  # centralised CSS injector
 )
-from components.ai_analysis import ai_analysis_tab_content  # single source of truth
+from components.sec_filing_analysis import sec_filing_analysis_tab_content
 
 # ——— page setup ————————————————————————————————————————————————
 st.set_page_config(page_title="AI Analysis", layout="wide")
@@ -42,4 +42,4 @@ with col_logout:
 st.sidebar.button("⬅️ Back to Home", on_click=lambda: st.switch_page("Home.py"))
 
 # ——— render the AI analysis tab content ————————————————
-ai_analysis_tab_content()
+sec_filing_analysis_tab_content()
