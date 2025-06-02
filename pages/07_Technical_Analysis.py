@@ -89,7 +89,7 @@ def ask_gemini(img_path: str, prompt: str) -> str:
 def tradingview_chart(symbol: str,
                       interval: str = "D",
                       theme: str = "light",
-                      height: int = 900,
+                      height: int = 1000,
                       width: int | None = None,
                       autosize: bool = True):
     """Embed TradingView Advanced Chart.  
@@ -136,7 +136,7 @@ date_to   = c2.date_input("To",   today)
 frame   = st.selectbox("Indicator frame", ["Daily","Weekly","Monthly"])
 tv_int  = st.selectbox("TV interval", ["1","15","30","60","D","W","M"], index=4)
 theme   = st.radio("Theme", ["auto","light","dark"], horizontal=True)
-height  = 750
+height  = 1000
 autosz  = st.checkbox("Autosize width", value=True)
 run_btn = st.button("🚀 Generate")
 
