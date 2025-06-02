@@ -91,7 +91,7 @@ def tradingview_chart(symbol: str,
                       theme: str = "light",
                       height: int = 1000,
                       width: int | None = None,
-                      autosize: bool = True):
+                      autosize: bool = False):
     """Embed TradingView Advanced Chart.  
        • autosize=True  → fills parent width (Streamlit column)  
        • autosize=False → fixed width passed via `width` arg."""
