@@ -33,7 +33,8 @@ def sec_filing_analysis_tab_content() -> None:
 
     if st.button("Generate analysis"):
         with st.spinner("Running generator …"):
-            html_path = _run_generator(script, ticker)
+            html_path, proc = _run_generator(script, ticker)
+
 
         if html_path and html_path.exists():
             st.success("Report generated!")
