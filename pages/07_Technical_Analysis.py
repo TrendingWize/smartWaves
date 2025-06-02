@@ -128,11 +128,14 @@ def tradingview_chart(symbol: str,
 # ─────────────────────────────────────────────────────────────────────────────
 st.title("📈 Technical Analysis – Interactive & AI Insights")
 
-symbol = st.text_input("Ticker", value="AAPL").upper().strip()
-today = dt.date.today(); default_from = today - dt.timedelta(days=365)
-c1, c2 = st.columns(2)
-date_from = c1.date_input("From", default_from)
-date_to   = c2.date_input("To",   today)
+today = dt.date.today()
+default_from = today - dt.timedelta(days=365)
+
+# ── all inputs in one horizontal row ────────────────────────────────
+col_ticker, col_from, col_to = st.columns(3)
+symbol     = col_ticker.text_input("Ticker", value="AAPL").upper().strip()
+date_from  = col_from.date_input("From", default_from)
+date_to    = col_to.date_input("To",   today)
 
 frame   = st.selectbox("Indicator frame", ["Daily","Weekly","Monthly"])
 tv_int  = st.selectbox("TV interval", ["1","15","30","60","D","W","M"], index=4)
