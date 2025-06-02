@@ -154,13 +154,20 @@ if run_btn:
         df  = add_indicators(resample(raw, frame))
 
     st.subheader("🔹 Interactive Chart")
-    tradingview_chart(exchange = st.selectbox("exchange", ["NASDAQ", "NYSE", "AMEX"]),
-    tv_symbol = f"{exchange}:{symbol}",
-                      interval=tv_int,
-                      theme=theme,
-                      height=height,
-                      autosize=autosz,
-                      width=None if autosz else 800)   # change 800 if you want different fixed width
+    # choose exchange, then fuse with ticker
+exchange = st.selectbox("Exchange", ["NASDAQ", "NYSE", "AMEX"], index=0)
+tv_symbol = f"{exchange}:{symbol}"
+
+st.subheader("🔹 Interactive Chart")
+tradingview_chart(
+    symbol=tv_symbol,          # <-- correct keyword
+    interval=tv_int,
+    theme=theme,
+    height=height,
+    autosize=autosz,
+    width=None if autosz else 800,
+)
+
 
     # Gemini commentary
     comp = save_composite_chart(df, symbol, frame)
