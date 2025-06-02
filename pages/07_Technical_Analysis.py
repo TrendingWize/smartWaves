@@ -81,6 +81,7 @@ def ask_gemini(img_path: str, prompt: str) -> str:
 def tradingview_chart(symbol: str, interval: str = "D",
                       theme: str = "light", height: int = 750,
                       width: int | None = None, autosize: bool = True):
+    # — widget options —
     props = {
         "symbol": symbol,
         "interval": interval,
@@ -90,8 +91,12 @@ def tradingview_chart(symbol: str, interval: str = "D",
         "timezone": "Etc/UTC",
         "allow_symbol_change": True,
         "support_host": "https://www.tradingview.com",
+        "height": height,                # 👈 tell TV how tall to be
     }
-    outer_style = f"height:{height}px;" + (f"width:{width}px;" if (not autosize and width) else "")
+    if autosize:
+        props["autosize"] = True         # fill parent width
+    else:
+        props["width"] = width or 800    # fixed pixel width
     html_code = f"""
     <div class="tradingview-widget-container" style="{outer_style}">
       <div id="tv_widget"></div>
