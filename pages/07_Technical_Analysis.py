@@ -95,11 +95,25 @@ def tradingview_chart(symbol: str, interval: str = "D",
     }
     outer_style = f"height:{height}px;" + (f"width:{width}px;" if (not autosize and width) else "")
     html_code = f"""
-    <div class="tradingview-widget-container" style="{outer_style}">
-      <div id="tv_widget"></div>
-      <script src="https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js"
-              async type="text/javascript">{json.dumps(props)}</script>
-    </div>
+    <!-- TradingView Widget BEGIN -->
+<div class="tradingview-widget-container" style="height:100%;width:100%">
+  <div class="tradingview-widget-container__widget" style="height:calc(100% - 32px);width:100%"></div>
+  <div class="tradingview-widget-copyright"><a href="https://www.tradingview.com/" rel="noopener nofollow" target="_blank"><span class="blue-text">Track all markets on TradingView</span></a></div>
+  <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js" async>
+  {
+  "autosize": true,
+  "symbol": "NASDAQ:AAPL",
+  "interval": "D",
+  "timezone": "Etc/UTC",
+  "theme": "dark",
+  "style": "1",
+  "locale": "en",
+  "allow_symbol_change": true,
+  "support_host": "https://www.tradingview.com"
+}
+  </script>
+</div>
+<!-- TradingView Widget END -->
     """
     html(html_code, height=height, width=width if not autosize else None, scrolling=False)
 
@@ -117,7 +131,7 @@ date_to   = col_to.date_input("To",   today)
 frame  = col_frame.selectbox("Indicator frame", ["Daily","Weekly","Monthly"])
 tv_int = col_tv.selectbox("TV interval", ["1","15","30","60","D","W","M"], index=4)
 theme   = st.radio("Theme", ["auto","light","dark"], horizontal=False)
-height  = 550
+height  = 750
 autosz  = st.checkbox("Autosize width", value=True)
 run_btn = st.button("🚀 Generate")
 
@@ -132,7 +146,8 @@ if run_btn:
     # --- Interactive chart -------------------------------------------------
     st.subheader("🔹 Interactive Chart")
     tradingview_chart(symbol=tv_symbol, interval=tv_int, theme=theme,
-                      height=height, autosize=False,
+                      height=height, autosize=autosize,
+                      autosize=False, 
                       width=None if autosz else 800)
 
     # --- Derive plain ticker for Python analysis (last part after ':')
