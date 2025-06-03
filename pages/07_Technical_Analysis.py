@@ -111,7 +111,8 @@ if run_btn:
             df =add_indicators(resample(raw,frame))
         cmp=save_composite_chart(df,tkr,frame)
         prompt=textwrap.dedent(f"""
-            **Role:** Expert Market Technician specializing in pure price action analysis. You master Elliott Wave theory, Wyckoff methodology, and classical chart patterns. All analysis must derive exclusively from **price structure, volume, and market geometry**.  
+**Role:** Expert Market Technician specializing in pure price action analysis. You master Elliott Wave theory, Wyckoff methodology, 
+and classical chart patterns. All analysis must derive exclusively from **price structure, volume, and market geometry**.  
 
 **Absolute Rules:**  
 ✅ Prioritize: Candlestick patterns, volume-profile, swing structure, and institutional accumulation/distribution signs  
@@ -119,7 +120,7 @@ if run_btn:
 ---
 
 **Analysis Task:**  
-Analyze the composite chart of {ticker} (Price + Volume only). Structure your response:  
+Analyze the composite chart of {sym} (Price + Volume only). Structure your response:  
 
 #### 1. **Market Structure Framework**  
 - **Trend Identification:**  
