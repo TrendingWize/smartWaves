@@ -1222,7 +1222,7 @@ def process_symbol_logic(
         "values": [
           {
             "period": "Fiscal year",
-            "growth_percent": "YoY revenue growth percentage"
+            "growth_percent": "list all YoY revenue growth percentage for all periods"
           }
         ],
         "explanation": "Thorough analysis of growth rate trajectory. Explain accelerations/decelerations, compare to industry benchmarks, and identify inflection points. Discuss sustainability of growth drivers.",
@@ -1241,8 +1241,8 @@ def process_symbol_logic(
       "gross_margin": {
         "values": [
           {
-            "period": "Fiscal year",
-            "value_percent": "Gross margin percentage for gross_margin"
+            "period": "list all Fiscal year periods",
+            "value_percent": "list all Gross margin percentage for gross_margin for all periods"
           }
         ],
         "explanation": "Comprehensive analysis of margin trends. Discuss input cost pressures, pricing power, product mix shifts, and operational efficiencies. Include supply chain and manufacturing yield impacts.",
