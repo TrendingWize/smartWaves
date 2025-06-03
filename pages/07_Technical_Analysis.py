@@ -57,14 +57,57 @@ def add_indicators(df):
     return df
 
 def save_composite_chart(df, tkr, frame):
-    fig, ax = plt.subplots(figsize=(12, 6)); ax.set_yscale("log")
-    ax.plot(df.index, df["close"], label="Close")
-    for sma, l in [("sma20", "SMA20"), ("sma50", "SMA50"), ("sma100", "SMA100")]:
-        ax.plot(df.index, df[sma], label=l)
-    ax.legend(); ax.set_title(f"{tkr} ({frame})")
-    path = OUT_DIR / f"{tkr}_{frame}_cmp.png"
-    fig.tight_layout(); fig.savefig(path, dpi=120); plt.close(fig)
-    return str(path)
+    import matplotlib.dates as mdates
+    from matplotlib.gridspec import GridSpec
+
+    fig = plt.figure(figsize=(12, 10))
+    gs = GridSpec(4, 1, height_ratios=[3, 1, 1, 1], hspace=0.3)
+
+    # ── 1. Price + SMAs ─────────────────────
+    ax1 = fig.add_subplot(gs[0])
+    ax1.plot(df.index, df["close"], label="Close", color="black")
+    for sma, label in [("sma20", "SMA20"), ("sma50", "SMA50"), ("sma100", "SMA100")]:
+        ax1.plot(df.index, df[sma], label=label)
+    ax1.set_title(f"{tkr} ({frame}) – Price & SMAs")
+    ax1.set_ylabel("Price (log scale)")
+    ax1.set_yscale("log")
+    ax1.legend()
+    ax1.grid(True)
+
+    # ── 2. Volume ───────────────────────────
+    ax2 = fig.add_subplot(gs[1], sharex=ax1)
+    ax2.bar(df.index, df["volume"], color="gray")
+    ax2.set_title("Volume")
+    ax2.set_ylabel("Volume")
+    ax2.grid(True)
+
+    # ── 3. MACD ─────────────────────────────
+    ax3 = fig.add_subplot(gs[2], sharex=ax1)
+    ax3.plot(df.index, df["MACD_12_26_9"], label="MACD", color="blue")
+    ax3.plot(df.index, df["MACDs_12_26_9"], label="Signal", color="orange")
+    ax3.fill_between(df.index, df["MACDh_12_26_9"], 0, color="gray", alpha=0.3, label="Histogram")
+    ax3.set_title("MACD")
+    ax3.legend()
+    ax3.grid(True)
+
+    # ── 4. RSI ──────────────────────────────
+    ax4 = fig.add_subplot(gs[3], sharex=ax1)
+    ax4.plot(df.index, df["rsi"], label="RSI", color="green")
+    ax4.axhline(70, color="red", linestyle="--")
+    ax4.axhline(30, color="blue", linestyle="--")
+    ax4.set_title("RSI (14)")
+    ax4.set_ylabel("RSI")
+    ax4.set_ylim(0, 100)
+    ax4.grid(True)
+
+    # ── Save ────────────────────────────────
+    ax4.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m"))
+    fig.autofmt_xdate()
+    output_path = OUT_DIR / f"{tkr}_{frame}_fullchart.png"
+    fig.tight_layout()
+    fig.savefig(output_path, dpi=120)
+    plt.close(fig)
+    return str(output_path)
 
 def ask_gemini(img, prompt):
     genai.configure(api_key=GOOGLE_API_KEY)
