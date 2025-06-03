@@ -17,6 +17,11 @@ import pandas as pd
 import streamlit as st
 from .financial_data_module import FinancialDataModule, Config
 
+APP_CONFIG = None
+FDM_MODULE_INSTANCE = None
+OPENAI_CLIENT_INSTANCE = None
+NEO4J_DRIVER_INSTANCE = None
+
 try:
     from neo4j import GraphDatabase, Driver, unit_of_work
 except ImportError:
