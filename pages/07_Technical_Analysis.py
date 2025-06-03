@@ -120,7 +120,7 @@ and classical chart patterns. All analysis must derive exclusively from **price 
 ---
 
 **Analysis Task:**  
-Analyze the composite chart of {sym} (Price + Volume only). Structure your response:  
+Analyze the composite chart of {c_sym} (Price + Volume only). Structure your response:  
 
 #### 1. **Market Structure Framework**  
 - **Trend Identification:**  
