@@ -1061,16 +1061,16 @@ def process_symbol_logic(
                 except json.JSONDecodeError as e: logger.error(f"Cache: Error decoding metadata_json for {symbol_to_process}: {e}"); return None
             else: logger.warning(f"Cache: Missing or invalid metadata_json for {symbol_to_process}."); return None
 
-            analysis_as_of_date_str = metadata_dict.get("as_of_date")
+            analysis_fillingDate_str = metadata_dict.get("fillingDate")
             report_node_filling_date_obj = report_node_data.get("fillingDate")
             report_node_filling_date_str = report_node_filling_date_obj.iso_format()[:10] if report_node_filling_date_obj and hasattr(report_node_filling_date_obj, 'iso_format') else None
 
-            logger.info(f"Cache Candidate for {symbol_to_process}: Node.fillingDate={report_node_filling_date_str}, Metadata.as_of_date={analysis_as_of_date_str}")
+            logger.info(f"Cache Candidate for {symbol_to_process}: Node.fillingDate={report_node_filling_date_str}, Metadata.fillingDate={analysis_fillingDate_str}")
 
-            # Core comparison: Prospective FMP fillingDate vs. cached analysis's as_of_date
-            if prospective_fmp_filling_date_str and analysis_as_of_date_str and \
-               prospective_fmp_filling_date_str == analysis_as_of_date_str:
-                logger.info(f"CACHE HIT: Prospective FMP Date ({prospective_fmp_filling_date_str}) matches Cached Analysis As-Of-Date ({analysis_as_of_date_str}).")
+            # Core comparison: Prospective FMP fillingDate vs. cached analysis's fillingDate
+            if prospective_fmp_filling_date_str and analysis_fillingDate_str and \
+               prospective_fmp_filling_date_str == analysis_fillingDate_str:
+                logger.info(f"CACHE HIT: Prospective FMP Date ({prospective_fmp_filling_date_str}) matches Cached Analysis As-Of-Date ({analysis_fillingDate_str}).")
                 
                 # Reconstruct the full report object
                 full_cached_report = {
@@ -1105,7 +1105,7 @@ def process_symbol_logic(
         if prospective_fmp_filling_date_str:
             cypher_for_cache_check = "MATCH (ar:AnalysisReport {symbol: $symbol_param, fillingDate: date($date_param)}) RETURN ar LIMIT 1"
             params_for_cache_check["date_param"] = prospective_fmp_filling_date_str
-        else: # Fallback if prospective date couldn't be determined, get latest and check its as_of_date
+        else: # Fallback if prospective date couldn't be determined, get latest and check its fillingDate
             cypher_for_cache_check = "MATCH (ar:AnalysisReport {symbol: $symbol_param}) RETURN ar ORDER BY ar.fillingDate DESC LIMIT 1"
 
         existing_analysis_report = neo4j_driver_instance.execute_query(
@@ -1741,7 +1741,7 @@ def process_symbol_logic(
             if not isinstance(current_meta, dict): current_meta = {}
             current_meta['ticker'] = symbol_to_process
             current_meta['fillingDate'] = actual_fmp_filling_date_str # For Neo4j node key
-            current_meta['as_of_date'] = actual_fmp_filling_date_str  # For cache comparison consistency
+            current_meta['fillingDate'] = actual_fmp_filling_date_str  # For cache comparison consistency
             current_meta['calendarYear'] = fmp_company_data.get("metadata_package", {}).get("fmp_calendar_year")
             generated_analysis_json['metadata'] = current_meta
             
@@ -1775,4 +1775,3 @@ def process_symbol_logic(
     except Exception as e_main:
         logger.error(f"OVERALL FAILED for {symbol_to_process} in main block: {e_main}", exc_info=True)
         return {"status": "overall_failure_main_process", "symbol": symbol_to_process, "error": str(e_main)}
-
