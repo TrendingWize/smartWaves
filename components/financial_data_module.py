@@ -13,6 +13,8 @@ import requests
 # Config dataclass (if you want to keep config inside the module)
 from dataclasses import dataclass, field
 
+logger = logging.getLogger("financial_data_module")
+
 @dataclass(slots=True, frozen=True)
 class Config:
     fmp_key: str
