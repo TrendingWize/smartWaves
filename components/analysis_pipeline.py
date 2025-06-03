@@ -1211,8 +1211,8 @@ def process_symbol_logic(
       "revenues": {
         "values": [
           {
-            "period": "Fiscal year (e.g., '2023')",
-            "value": "Absolute revenue figure for period"
+            "period": "Fiscal year for all periods (e.g., '2023')",
+            "value": "Absolute revenue figure for all periods"
           }
         ],
         "explanation": "Detailed narrative analysis of revenue trends over time. Discuss growth patterns, anomalies, and business drivers using 5+ years of data. Reference pricing changes, volume impacts, acquisitions, and market share dynamics.",
