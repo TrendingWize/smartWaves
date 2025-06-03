@@ -1,15 +1,15 @@
 # pages/11_ask_ai_tab.py
 
 import streamlit as st
+# Page config
 st.set_page_config(page_title="Ask AI - Smart Waves", layout="wide")
-
 
 import os
 import openai
 from langchain_neo4j import Neo4jGraph
 from ask_neo4j import ask_neo4j_logic, initialize_llm_and_embeddings_askai
 
-# Page config
+
 st.markdown("## 🤖 Ask AI (Dual Analysis)")
 st.markdown("Ask one question and get responses from both GPT-4 and Gemini.")
 
@@ -54,7 +54,7 @@ if submitted and question:
         try:
             client = openai.OpenAI()
             stream = client.chat.completions.create(
-                model="gpt-4o",
+                model=st.secrets.get("OPENAI_MODEL", "gpt-4o"),
                 messages=[{"role": "user", "content": f"{context_gpt}\n\nUser question:\n{question}"}],
                 stream=True,
                 temperature=0.3
