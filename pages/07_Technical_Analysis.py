@@ -114,13 +114,12 @@ if run_btn:
             **Role:** Expert Market Technician specializing in pure price action analysis. You master Elliott Wave theory, Wyckoff methodology, and classical chart patterns. All analysis must derive exclusively from **price structure, volume, and market geometry**.  
 
 **Absolute Rules:**  
-❌ Never use indicators (SMA/MACD/RSI)  
 ✅ Prioritize: Candlestick patterns, volume-profile, swing structure, and institutional accumulation/distribution signs  
 
 ---
 
 **Analysis Task:**  
-Analyze the {timeframe} composite chart of {ticker} (Price + Volume only). Structure your response:  
+Analyze the composite chart of {ticker} (Price + Volume only). Structure your response:  
 
 #### 1. **Market Structure Framework**  
 - **Trend Identification:**  
