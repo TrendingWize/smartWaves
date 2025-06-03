@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 
 @dataclass(slots=True, frozen=True)
 class Config:
-    fmp_key: str,
+    fmp_key: str
     openai_key: str = ""
     user_agent: str = "TrendingWizeAnalysis/2.0"
     price_look_forward: int = 7
