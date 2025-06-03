@@ -15,7 +15,7 @@ from openai import OpenAI, APIError, APIConnectionError, RateLimitError, BadRequ
 import requests
 import pandas as pd
 import streamlit as st
-from financial_data_module import FinancialDataModule, Config
+from .financial_data_module import FinancialDataModule, Config
 try:
     from neo4j import GraphDatabase, Driver, unit_of_work
 except ImportError:
