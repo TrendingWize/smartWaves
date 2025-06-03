@@ -141,7 +141,7 @@ if __name__ == "__main__":
     class MockEmbeddingsStandalone:
         def embed_query(self, text_arg): return [0.1] * 768 # Dummy embedding, ensure dim matches if used
 
-    @st.cache_resource # Mocking the cached function
+    #@st.cache_resource # Mocking the cached function
     def initialize_llm_and_embeddings_askai(provider_arg): # Renamed arg
         print(f"Mock: Initializing AI for provider: {provider_arg}")
         return MockLLMStandalone(), MockEmbeddingsStandalone(), provider_arg
