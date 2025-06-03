@@ -41,132 +41,87 @@ llm, vectorstore = initialize_llm_and_embeddings_askai('openai')
 
 
 def ask_ai_tab_content():
-    # --- Centering the input section ---
-    st.markdown("""
-        <style>
-        .main-ask-ai-container {
-            display: flex;
-            flex-direction: column;
-            align-items: center; /* Horizontally center */
-            padding-top: 2rem; 
-        }
-        .ask-ai-input-area {
-            width: 70%; 
-            max-width: 900px;
-        }
-        .ask-ai-button-container {
-            width: 70%;
-            max-width: 900px;
-            display: flex;
-            justify-content: center; 
-            margin-top: 1rem;
-        }
-        </style>
-    """, unsafe_allow_html=True)
+    st.markdown("## 🤖 Ask AI")
 
-    # --- AI Provider Selection ---
-    # For simplicity, hardcoding. Make this a st.selectbox or st.radio if needed.
-    # Ensure the selected provider matches what initialize_llm_and_embeddings_askai expects.
-    llm_provider = "openai" 
-    # llm_provider = st.radio("Select AI Provider:", ("openai", "gemini"), horizontal=True, key="ask_ai_provider_select_tab")
+    tab1, tab2 = st.tabs(["🧠 GPT-4", "🌟 Gemini"])
+
+    with tab1:
+        run_ask_ai_ui("openai")
+
+    with tab2:
+        run_ask_ai_ui("gemini")
 
 
-    # --- Main Input Container (Centered) ---
+def run_ask_ai_ui(provider: str):
+    st.markdown(f"### Chat with {provider.upper()}")
+
     st.markdown("<div class='main-ask-ai-container'>", unsafe_allow_html=True)
     
     st.markdown("<div class='ask-ai-input-area'>", unsafe_allow_html=True)
     question = st.text_area(
         "Ask anything about the financial data...",
-        height=100, 
-        key="ask_ai_question_input_tab", # Unique key for this instance
-        placeholder="e.g., What was Apple's revenue in 2022? or Companies similar to Nvidia in semiconductors?"
+        height=100,
+        key=f"{provider}_ask_input",
+        placeholder="e.g., What was Apple's revenue in 2022?"
     )
     st.markdown("</div>", unsafe_allow_html=True)
 
     st.markdown("<div class='ask-ai-button-container'>", unsafe_allow_html=True)
-    ask_button = st.button("🤖 Ask AI", key="ask_ai_submit_button_tab", type="primary", use_container_width=True) # Unique key
+    ask_button = st.button("🤖 Ask AI", key=f"{provider}_ask_button", type="primary", use_container_width=True)
     st.markdown("</div>", unsafe_allow_html=True)
-    
-    st.markdown("</div>", unsafe_allow_html=True) 
-    
-    st.markdown("---") 
 
-    # --- Session State for Results ---
-    if 'ask_ai_response_tab' not in st.session_state: # Using suffix _tab for uniqueness
-        st.session_state.ask_ai_response_tab = None
-    if 'ask_ai_cypher_tab' not in st.session_state:
-        st.session_state.ask_ai_cypher_tab = None
-    if 'ask_ai_params_tab' not in st.session_state:
-        st.session_state.ask_ai_params_tab = None
-
+    st.markdown("</div>", unsafe_allow_html=True)
+    st.markdown("---")
 
     if ask_button and question:
-        # Clear previous results for this tab
-        st.session_state.ask_ai_response_tab = None 
-        st.session_state.ask_ai_cypher_tab = None
-        st.session_state.ask_ai_params_tab = None
-
-        with st.spinner("Thinking... 🧠 Please wait."): # Added "Please wait"
+        with st.spinner(f"Sending your question to {provider.upper()}..."):
             try:
-                # 1. Initialize LLM and Embeddings (from ask_neo4j.py)
-                llm, embeddings, llm_provider_name_used = initialize_llm_and_embeddings_askai(llm_provider)
-                
-                # 2. Initialize Neo4jGraph instance
-                # This was the source of the TypeError. Neo4jGraph takes url, user, pass.
+                llm, embeddings, llm_provider = initialize_llm_and_embeddings_askai(provider)
                 graph = Neo4jGraph(
                     url=NEO4J_URI,
                     username=NEO4J_USER,
-                    password=NEO4J_PASSWORD,
-                    database="neo4j" # Specify your database if not default
+                    password=NEO4J_PASSWORD
                 )
-                # Optional: A quick test to ensure graph connection works before LLM calls
-                try:
-                    graph.query("RETURN 1 AS test")
-                except Exception as graph_e:
-                    st.error(f"Failed to connect to Neo4j with Neo4jGraph: {graph_e}")
-                    st.stop() # Stop execution if graph connection fails
-
-                # 3. Call the refactored logic from ask_neo4j.py
-                cypher_query, params_str, final_answer, raw_result = ask_neo4j_logic(
-                    graph_instance=graph,       # Pass the Neo4jGraph instance
+                context = ask_neo4j_logic(
+                    graph_instance=graph,
                     question_text=question,
                     llm_instance=llm,
                     embeddings_instance=embeddings,
-                    llm_provider_name=llm_provider_name_used, 
+                    llm_provider_name=llm_provider,
                     explain_flag=True
                 )
-                st.session_state.ask_ai_cypher_tab = cypher_query
-                st.session_state.ask_ai_params_tab = params_str
-                st.session_state.ask_ai_response_tab = final_answer
 
-            except ValueError as ve: # Catch API key errors or other ValueErrors from init
-                st.error(str(ve))
-                st.session_state.ask_ai_response_tab = f"Initialization Error: {str(ve)}"
+                prompt = f"{context}\n\nUser question:\n{question}"
+
+                if provider == "gemini":
+                    import google.generativeai as genai
+                    gemini = genai.GenerativeModel('gemini-pro')
+                    response = gemini.generate_content(prompt)
+                    st.markdown(response.text)
+                else:
+                    import openai
+                    client = openai.OpenAI()
+                    stream = client.chat.completions.create(
+                        model=st.secrets.get("OPENAI_MODEL", "gpt-4o"),
+                        messages=[{"role": "user", "content": prompt}],
+                        stream=True,
+                        temperature=0.3
+                    )
+                    response_box = st.empty()
+                    full_response, buffer, counter = "", "", 0
+                    for chunk in stream:
+                        delta = chunk.choices[0].delta.content or ""
+                        buffer += delta
+                        counter += 1
+                        if counter % 5 == 0:
+                            full_response += buffer
+                            response_box.markdown(f"🤖 **AI:** {full_response}", unsafe_allow_html=True)
+                            buffer = ""
+                    full_response += buffer
+                    response_box.markdown(f"🤖 **AI:** {full_response}", unsafe_allow_html=True)
+
             except Exception as e:
-                st.error(f"An unexpected error occurred: {e}")
-                traceback.print_exc() 
-                st.session_state.ask_ai_response_tab = f"An unexpected error occurred. Please check server logs. Error: {str(e)}"
-        st.rerun() # Rerun to display new results or clear old ones if an error occurred mid-process
-
-    # Display the results from session state
-    if st.session_state.ask_ai_response_tab:
-        st.subheader("💡 AI Response:")
-        st.markdown(st.session_state.ask_ai_response_tab, unsafe_allow_html=True) # Allow HTML if answer has Markdown tables etc.
-
-        # Only show Cypher if it was successfully generated and not an error message
-        if st.session_state.ask_ai_cypher_tab and \
-           st.session_state.ask_ai_cypher_tab not in ["No Cypher generated.", "Prompt Formatting Error", 
-                                                     "LLM JSON Parsing Error", "Invalid Cypher from LLM"]:
-            with st.expander("Show Generated Cypher Query & Parameters"):
-                st.code(st.session_state.ask_ai_cypher_tab, language="cypher")
-                if st.session_state.ask_ai_params_tab and st.session_state.ask_ai_params_tab != "{}":
-                    try: # Try to pretty print JSON if params_str is valid JSON
-                        params_dict = json.loads(st.session_state.ask_ai_params_tab)
-                        st.json(params_dict)
-                    except json.JSONDecodeError:
-                        st.code(st.session_state.ask_ai_params_tab, language="json") # Fallback to code block
-    elif ask_button and not question: # If ask was clicked but question was empty
-        st.warning("Please enter a question to ask the AI.")
+                st.error(f"❌ Error using {provider.upper()}: {e}")
 
 
 # --- Standalone run mock (ensure ask_neo4j.py mocks are also robust) ---
