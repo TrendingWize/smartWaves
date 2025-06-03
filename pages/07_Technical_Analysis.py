@@ -108,7 +108,7 @@ def tv_chart(sym, interval, theme, height, width, autosize):
     """, height=height, width=None if autosize else width or 800, scrolling=False)
 
 # ── UI ──────────────────────────────────────────────────────────────────────
-st.title("\ud83d\udcc8 Technical Analysis – Interactive & AI Insights")
+st.title("📈 Technical Analysis – Interactive & AI Insights")
 
 # language selector
 c_language = st.selectbox("Language", ["Arabic", "English"])
