@@ -1595,11 +1595,12 @@ def process_symbol_logic(
                     {"role": "system", "content": instructions},
                     {"role": "user", "content": f"{period.capitalize()} Company financial information (JSON):\n{fmp_company_data_string}\n\nQuestion: {question}"}
                 ],
-                #response_format={"type": "json_object"},
+                response_format={"type": "json_object"},
                 max_completion_tokens=8192
             )
             response_obj_for_metadata = response # Save for metadata if successful
             message_content = response.choices[0].message.content
+            #print(message_content)
             if message_content:
                 try: 
                     generated_analysis_json = json.loads(message_content)
