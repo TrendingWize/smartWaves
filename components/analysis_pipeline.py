@@ -1242,7 +1242,7 @@ def process_symbol_logic(
         "values": [
           {
             "period": "Fiscal year",
-            "value_percent": "Gross margin percentage"
+            "value_percent": "Gross margin percentage for gross_margin"
           }
         ],
         "explanation": "Comprehensive analysis of margin trends. Discuss input cost pressures, pricing power, product mix shifts, and operational efficiencies. Include supply chain and manufacturing yield impacts.",
