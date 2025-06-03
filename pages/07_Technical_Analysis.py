@@ -1,20 +1,42 @@
 # smart_waves/pages/07_Technical_Analysis.py
+import streamlit as st
+st.set_page_config(page_title="Technical Analysis", layout="wide")
+
 import json, textwrap, datetime as dt, re
 from pathlib import Path
 
 import requests, pandas as pd, pandas_ta as ta
 import matplotlib.pyplot as plt
-import streamlit as st
 from streamlit.components.v1 import html
 from PIL import Image
 import google.generativeai as genai
 
-st.set_page_config(page_title="Technical Analysis", layout="wide")
+
+# ── RTL/LTR style injection ────────────────────────────────────────────────
+def inject_rtl_css(lang):
+    rtl = lang.lower() == "arabic"
+    st.markdown(
+        f"""
+        <style>
+        html, body, [class*="css"] {{
+            direction: {'rtl' if rtl else 'ltr'};
+            text-align: {'right' if rtl else 'left'};
+            font-family: 'Cairo', sans-serif;
+        }}
+        </style>
+        <link href="https://fonts.googleapis.com/css2?family=Cairo&display=swap" rel="stylesheet">
+        """,
+        unsafe_allow_html=True
+    )
 
 # ── secrets / constants ─────────────────────────────────────────────────────
 FMP_API_KEY    = st.secrets.get("FMP_API_KEY")
 GOOGLE_API_KEY = st.secrets.get("GOOGLE_API_KEY")
 OUT_DIR        = Path("charts"); OUT_DIR.mkdir(exist_ok=True)
+
+# ── language selector and RTL setup ─────────────────────────────────────────
+c_language = st.selectbox("Language", ["Arabic", "English"])
+inject_rtl_css(c_language)
 
 # ── data helpers ────────────────────────────────────────────────────────────
 @st.cache_data(ttl=3_600)
@@ -74,17 +96,16 @@ def tv_chart(sym,interval,theme,height,width,autosize):
     </div>
     """,height=height,width=None if autosize else width or 800,scrolling=False)
 
-# ── UI ──────────────────────────────────────────────────────────────────────
+# ── UI Layout ───────────────────────────────────────────────────────────────
 st.title("📈 Technical Analysis – Interactive & AI Insights")
 
-c_sym,c_from,c_to,c_frm,c_int,c_language=st.columns([3,2,2,2,2,2])
+c_sym,c_from,c_to,c_frm,c_int = st.columns([3,2,2,2,2])
 tv_symbol=c_sym.text_input("TradingView Symbol","NASDAQ:AAPL").upper().strip()
 today=dt.date.today()
 date_from=c_from.date_input("From",today-dt.timedelta(days=365))
 date_to  =c_to.date_input("To",today)
-frame   =c_frm.selectbox("Indicator frame",["Daily","Weekly","Monthly"])
-c_language  =c_language.selectbox("Indicator frame",["Arabic","English"])
-tv_int  =c_int.selectbox("TV interval",["1","15","30","60","D","W","M"],4)
+frame    =c_frm.selectbox("Indicator frame",["Daily","Weekly","Monthly"])
+tv_int   =c_int.selectbox("TV interval",["1","15","30","60","D","W","M"],4)
 
 height=st.slider("Chart height (px)",400,1000,750)
 
