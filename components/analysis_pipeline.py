@@ -81,7 +81,7 @@ OPENAI_CLIENT_INSTANCE = None
 NEO4J_DRIVER_INSTANCE = None # This should be managed by Streamlit's lifecycle
 
 # Function to initialize shared resources if not already done
-@st.cache_resource(show_spinner="Initializing OpenAI Client for Report Pipeline...")
+#@st.cache_resource(show_spinner="Initializing OpenAI Client for Report Pipeline...")
 def initialize_analysis_resources():
     global APP_CONFIG, FDM_MODULE_INSTANCE, OPENAI_CLIENT_INSTANCE, NEO4J_DRIVER_INSTANCE
 
@@ -126,15 +126,31 @@ def initialize_analysis_resources():
             if not APP_CONFIG.neo4j_password: missing_details.append("NEO4J_PASSWORD missing") # Added check
             logger.warning(f"Neo4j driver not initialized globally. Missing: {', '.join(missing_details)}.")
             NEO4J_DRIVER_INSTANCE = None # Explicitly set to None
+            
+        pass
     # --- END OF ADDED/MODIFIED SECTION ---
 
 # --- Main function to be called by Streamlit ---
 def generate_ai_report(
     symbol_to_process: str,
-    report_period: str, # 'annual' or 'quarter'
-    period_back_offset: int = 0,
-    st_neo4j_driver: Optional[Driver] = None # Allow passing Streamlit cached driver
+    report_period: str,
+    period_back_offset: int = 0
+    # REMOVE st_neo4j_driver parameter if you exclusively use the global
 ) -> Optional[Dict[str, Any]]:
+    initialize_analysis_resources() # Sets global NEO4J_DRIVER_INSTANCE
+
+    report_data = process_symbol_logic(
+        symbol_to_process=symbol_to_process,
+        current_period_back_val=period_back_offset,
+        fdm_module_instance=FDM_MODULE_INSTANCE,
+        openai_client_instance=OPENAI_CLIENT_INSTANCE,
+        neo4j_driver_instance=NEO4J_DRIVER_INSTANCE, # <--- USE THE GLOBAL INSTANCE
+        app_config=APP_CONFIG,
+        # Make sure to pass report_period to process_symbol_logic too
+        # process_symbol_logic(..., report_period_param=report_period)
+    )
+    # ...
+    return report_data
     """
     Generates an AI financial analysis report for a given symbol and period.
     Returns the full analysis report dictionary or None on failure.
