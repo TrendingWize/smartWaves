@@ -83,7 +83,7 @@ today=dt.date.today()
 date_from=c_from.date_input("From",today-dt.timedelta(days=365))
 date_to  =c_to.date_input("To",today)
 frame   =c_frm.selectbox("Indicator frame",["Daily","Weekly","Monthly"])
-c_languagec  =c_languagec.selectbox("Indicator frame",["Arabic","English"])
+c_language  =c_language.selectbox("Indicator frame",["Arabic","English"])
 tv_int  =c_int.selectbox("TV interval",["1","15","30","60","D","W","M"],4)
 
 height=st.slider("Chart height (px)",400,1000,750)
