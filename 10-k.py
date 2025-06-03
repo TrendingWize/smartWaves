@@ -163,7 +163,8 @@ async def _answer_one(q:str, tk:str,
     context = "\n\n".join(doc_chunks[i] for i in idxs)
     prompt = textwrap.dedent(f"""
         You are a precise financial analyst.
-        Use ONLY the context provided to answer the question in 4-6 lines.
+        Use ONLY the context provided to answer the question. youre resonse **MUST** be as Markdown format.
+        Use appropriat Markdown formating for the answer like title, headings, tables etc...
         Question: {q}
         <CONTEXT>
         {context}
@@ -172,7 +173,7 @@ async def _answer_one(q:str, tk:str,
     rsp = await openai_client.chat.completions.create(
         model=CHAT_MODEL,
         temperature=0.3,
-        max_tokens=300,
+        max_tokens=4000,
         messages=[{"role":"user","content":prompt}]
     )
     return q, rsp.choices[0].message.content.strip()
