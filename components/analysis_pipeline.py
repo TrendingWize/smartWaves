@@ -1179,8 +1179,17 @@ def process_symbol_logic(
             return {"status": "data_only_no_openai", "symbol": symbol_to_process, "fmp_data": fmp_company_data}
 
         question = f"Perform a detailed {period} financial and fundamental analysis for ({symbol_to_process}) company using the provided data."
-        instructions = """
-        # Financial Analysis Template
+        instructions = """You are a financial analyst specializing in detailed financial analysis and valuation.
+        Utilize the provided **annual** financial data (income statements, balance sheets, cash flow statements), peer metrics, and company profile (found in the user message) to perform a thorough **annual** financial and fundamental analysis.
+        The analysis must address the company’s growth trajectory, operational efficiency, and valuation against peers.
+        Be precise, unbiased, and objective in your analysis. Avoid being overly bullish or bearish.
+        Consider last_price currency. All textual content within the Markdown should use standard **ASCII** characters only; **avoid** non-standard Unicode characters (e.g \u2013, \u2019 etc...).
+        For valuation models requiring assumptions (like DCF discount rate, growth rates, etc.) that are not explicitly provided, state the reasonable assumptions you are making. Base calculations *only* on the provided data context and your financial expertise.
+        **Rely in your response only on context provided to you**.
+        **Strictly return a single JSON object that conforms precisely to the following Markdown structure. Do not include any other text, markdown, or explanations outside the JSON structure.**
+        **do not add new line character (\n)**
+
+# Financial Analysis Template
 
 ## metadata
 - **company_name**: Full legal name of the company. Extract from provided financial data under 'metadata.company_name'
