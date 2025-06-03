@@ -202,7 +202,7 @@ if run_btn:
         and classical chart patterns. All analysis must derive exclusively from **price structure, volume, and market geometry**. Response in {c_language} language.
 
         **Absolute Rules:**  
-        ✅ Prioritize: Candlestick patterns, volume-profile, swing structure, and institutional accumulation/distribution signs.
+        ✅ Prioritize: Candlestick patterns, volume-profile, swing structure, institutional accumulation/distribution signs and chart indicators.
 
         #### 1. **Market Structure Framework**
         - **Trend Identification:** swing highs/lows, Wyckoff phase  
