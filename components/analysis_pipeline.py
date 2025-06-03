@@ -989,7 +989,7 @@ def save_analysis_to_neo4j(tx, symbol_param: str, analysis_report_data: Dict[str
         
         "metadata_json_str": json.dumps(metadata_block), 
         "analysis_json_str": json.dumps(analysis_block), 
-        "fmp_data_snapshot_json_str": json.dumps(fmp_data_snapshot_block, default=str), 
+        #"fmp_data_snapshot_json_str": json.dumps(fmp_data_snapshot_block, default=str), 
 
         "prompt_tokens": analysis_report_data.get("prompt_tokens"),
         "completion_tokens": analysis_report_data.get("completion_tokens"),
@@ -1118,10 +1118,10 @@ def process_symbol_logic(
                     try: full_cached_report['analysis'] = json.loads(report_node_data['analysis_json'])
                     except json.JSONDecodeError as e: logger.error(f"Cache: Error decoding analysis_json for {symbol_to_process}: {e}"); # Keep analysis as {}
                 
-                 If fmp_data_snapshot_json was stored, load it
-                if 'fmp_data_snapshot_json' in report_node_data and isinstance(report_node_data['fmp_data_snapshot_json'], str):
-                    try: full_cached_report['fmp_data_for_analysis'] = json.loads(report_node_data['fmp_data_snapshot_json'])
-                    except json.JSONDecodeError as e: logger.error(f"Cache: Error decoding fmp_data_snapshot_json for {symbol_to_process}: {e}");
+                # If fmp_data_snapshot_json was stored, load it
+                #if 'fmp_data_snapshot_json' in report_node_data and isinstance(report_node_data['fmp_data_snapshot_json'], str):
+                #    try: full_cached_report['fmp_data_for_analysis'] = json.loads(report_node_data['fmp_data_snapshot_json'])
+                #    except json.JSONDecodeError as e: logger.error(f"Cache: Error decoding fmp_data_snapshot_json for {symbol_to_process}: {e}");
 
                 return full_cached_report
             
