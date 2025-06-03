@@ -17,10 +17,14 @@ import pandas as pd
 import streamlit as st
 from .financial_data_module import FinancialDataModule, Config
 
-APP_CONFIG = None
-FDM_MODULE_INSTANCE = None
-OPENAI_CLIENT_INSTANCE = None
-NEO4J_DRIVER_INSTANCE = None
+APP_CONFIG = Config(
+    fmp_key=FMP_API_KEY,
+    openai_key=OPENAI_API_KEY,
+    neo4j_uri=NEO4J_URI,
+    neo4j_user=NEO4J_USER,
+    neo4j_password=NEO4J_PASSWORD,
+)
+
 
 try:
     from neo4j import GraphDatabase, Driver, unit_of_work
