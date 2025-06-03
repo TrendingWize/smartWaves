@@ -480,7 +480,7 @@ class FinancialDataModule:
         self,
         exchange: str,
         industry_name: str, # Renamed from industry
-        anchor_date: Optional[str | dt_class.date] = None, # Use aliased dt_class
+        anchor_date: Optional[str | date] = None
     ) -> Optional[List[Dict[str, Any]]]:
         target_date: Optional[dt_class.date] = None # Use aliased dt_class
         if anchor_date is None:
