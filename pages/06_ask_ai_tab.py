@@ -17,7 +17,7 @@ st.markdown("Ask one question and get responses from both GPT-4 and Gemini.")
 NEO4J_URI = st.secrets.get("NEO4J_URI") or os.getenv("NEO4J_URI")
 NEO4J_USERNAME = st.secrets.get("NEO4J_USER") or os.getenv("NEO4J_USER")
 NEO4J_PASSWORD = st.secrets.get("NEO4J_PASSWORD") or os.getenv("NEO4J_PASSWORD")
-OPENAI_API_KEY = st.secrets.get("OPENAI_API_KEY") or os.getenv("OPENAI_API_KEY")
+OPENAI_MODEL = st.secrets.get("OPENAI_MODEL", "gpt-4o")  # Default model
 GOOGLE_API_KEY = st.secrets.get("GOOGLE_API_KEY") or os.getenv("GOOGLE_API_KEY")
 
 # Connect to Neo4j
