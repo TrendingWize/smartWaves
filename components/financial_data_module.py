@@ -13,6 +13,7 @@ import requests
 # Config dataclass (if you want to keep config inside the module)
 from dataclasses import dataclass, field
 
+DEFAULT_MAX_WORKERS = os.cpu_count() or 4
 logger = logging.getLogger("financial_data_module")
 
 def _redact(url: str, key: str) -> str:
@@ -228,7 +229,7 @@ class FinancialDataModule:
         tickers = [symbol, *peers]
         out: List[Dict[str, Any]] = []
         # Ensure DEFAULT_MAX_WORKERS is at least 1
-        #max_workers_for_pool = max(1, DEFAULT_MAX_WORKERS)
+        max_workers_for_pool = max(1, DEFAULT_MAX_WORKERS)
 
         with ThreadPoolExecutor(max_workers=max_workers_for_pool) as pool:
             fut_quotes = {
@@ -551,7 +552,7 @@ class FinancialDataModule:
         company_sector = profile.get("sector") # Renamed to avoid conflict
         company_industry = profile.get("industry") # Renamed to avoid conflict
     
-        max_workers_for_pool = max(1, DEFAULT_MAX_WORKERS)
+        #max_workers_for_pool = max(1, DEFAULT_MAX_WORKERS)
         with ThreadPoolExecutor(max_workers=max_workers_for_pool) as pool:
             fut_income = pool.submit(
                 self.get_financial_statements,
