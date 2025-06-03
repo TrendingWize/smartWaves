@@ -2,10 +2,10 @@ import json
 import logging
 import random
 import time
-from datetime import datetime as dt_class, timedelta
 from concurrent.futures import ThreadPoolExecutor
 from functools import lru_cache, wraps
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
+from datetime import datetime as dt_class, date, timedelta
 
 import requests
 
@@ -416,7 +416,7 @@ class FinancialDataModule:
         self,
         exchange: str,
         sector_name: str, # Renamed from sector to avoid conflict
-        anchor_date: Optional[str | dt_class.date] = None, # Use aliased dt_class
+        anchor_date: Optional[str | date] = None,
     ) -> Optional[List[Dict[str, Any]]]:
         target_date: Optional[dt_class.date] = None
         if anchor_date is None:
