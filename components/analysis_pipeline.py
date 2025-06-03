@@ -1192,7 +1192,7 @@ def process_symbol_logic(
         **Strictly return a single JSON object that conforms precisely to the following JSON structure. Do not include any other text, markdown, or explanations outside the JSON structure.**
         **do not add new line character (\n)**
         JSON:
-       {
+      {
   "metadata": {
     "company_name": "Full legal name of the company. Extract from provided financial data under 'metadata.company_name'",
     "ticker": "Stock ticker symbol. Extract from provided financial data under 'metadata.ticker'",
@@ -1211,8 +1211,8 @@ def process_symbol_logic(
       "revenues": {
         "values": [
           {
-            "period": "Fiscal year for all periods (e.g., '2023')",
-            "value": "list all revenue figure for all periods"
+            "period": "list all Fiscal years provided (e.g., '2023')",
+            "value": "list all Absolute revenue figure per period for all periods"
           }
         ],
         "explanation": "Detailed narrative analysis of revenue trends over time. Discuss growth patterns, anomalies, and business drivers using 5+ years of data. Reference pricing changes, volume impacts, acquisitions, and market share dynamics.",
@@ -1221,8 +1221,8 @@ def process_symbol_logic(
       "revenue_growth_rates": {
         "values": [
           {
-            "period": "Fiscal year",
-            "growth_percent": "list all YoY revenue growth percentage for all periods"
+            "period": "list all Fiscal year provided",
+            "growth_percent": "list all YoY revenue growth percentages for all perids"
           }
         ],
         "explanation": "Thorough analysis of growth rate trajectory. Explain accelerations/decelerations, compare to industry benchmarks, and identify inflection points. Discuss sustainability of growth drivers.",
@@ -1241,8 +1241,8 @@ def process_symbol_logic(
       "gross_margin": {
         "values": [
           {
-            "period": "list all Fiscal year periods",
-            "value_percent": "list all Gross margin percentage for gross_margin for all periods"
+            "period": "list all Fiscal years provided",
+            "value_percent": "list all Gross margin percentages per period for all periods"
           }
         ],
         "explanation": "Comprehensive analysis of margin trends. Discuss input cost pressures, pricing power, product mix shifts, and operational efficiencies. Include supply chain and manufacturing yield impacts.",
@@ -1251,8 +1251,8 @@ def process_symbol_logic(
       "ebitda_margin": {
         "values": [
           {
-            "period": "Fiscal year",
-            "value_percent": "EBITDA margin percentage"
+            "period": "list all Fiscal years ",
+            "value_percent": "list all EBITDA margin percentages for all periods"
           }
         ],
         "explanation": "Detailed analysis of operational profitability. Cover OPEX leverage, SG&A efficiency, R&D ROI, and non-recurring items. Benchmark against sector peers.",
@@ -1261,8 +1261,8 @@ def process_symbol_logic(
       "net_margin": {
         "values": [
           {
-            "period": "Fiscal year",
-            "value_percent": "Net income margin percentage"
+            "period": "list all Fiscal years",
+            "value_percent": "list all Net income margin percentages for all periods"
           }
         ],
         "explanation": "Comprehensive analysis of bottom-line profitability. Address tax efficiency, interest expense trends, extraordinary items, and capital structure impacts.",
@@ -1272,8 +1272,8 @@ def process_symbol_logic(
         "ebitda": {
           "values": [
             {
-              "period": "Fiscal year",
-              "value": "Absolute EBITDA figure"
+              "period": "list all Fiscal years",
+              "value": "list all Absolute EBITDA figures for all periods"
             }
           ],
           "explanation": "Detailed analysis of EBITDA evolution. Discuss operational efficiency, depreciation policies, and recurring vs. non-recurring components.",
@@ -1282,8 +1282,8 @@ def process_symbol_logic(
         "operating_income": {
           "values": [
             {
-              "period": "Fiscal year",
-              "value": "Absolute operating income figure"
+              "period": "list all Fiscal years",
+              "value": "list all Absolute operating income figures for all periods"
             }
           ],
           "explanation": "Comprehensive analysis of core business profitability. Cover segment performance, fixed vs. variable cost dynamics, and operating leverage.",
@@ -1292,8 +1292,8 @@ def process_symbol_logic(
         "net_income": {
           "values": [
             {
-              "period": "Fiscal year",
-              "value": "Absolute net income figure"
+              "period": "list all Fiscal years",
+              "value": "list all Absolute net income figures for all periods"
             }
           ],
           "explanation": "Thorough analysis of bottom-line performance. Address tax strategies, interest coverage, non-operating items, and earnings quality.",
@@ -1302,8 +1302,8 @@ def process_symbol_logic(
         "eps_diluted": {
           "values": [
             {
-              "period": "Fiscal year",
-              "value": "Diluted EPS figure"
+              "period": "list all Fiscal years",
+              "value": "list all Diluted EPS figures for all periods"
             }
           ],
           "explanation": "Detailed analysis of per-share profitability. Discuss share count changes, dilution impacts, and capital allocation decisions.",
@@ -1332,8 +1332,8 @@ def process_symbol_logic(
         "roa": {
           "values": [
             {
-              "period": "Fiscal year",
-              "value_percent": "Return on Assets percentage"
+              "period": "list all Fiscal years",
+              "value_percent": "list all Return on Assets percentages for all periods"
             }
           ],
           "explanation": "Comprehensive analysis of asset efficiency. Discuss capital allocation effectiveness, asset turnover trends, and balance sheet optimization.",
@@ -1342,8 +1342,8 @@ def process_symbol_logic(
         "roic": {
           "values": [
             {
-              "period": "Fiscal year",
-              "value_percent": "Return on Invested Capital percentage"
+              "period": "list all Fiscal years",
+              "value_percent": "list all Return on Invested Capital percentages for all periods"
             }
           ],
           "explanation": "Detailed analysis of capital efficiency. Cover WACC comparison, invested capital composition, and value creation capability.",
@@ -1356,8 +1356,8 @@ def process_symbol_logic(
         "current_ratio": {
           "values": [
             {
-              "period": "Fiscal year",
-              "value": "Current ratio value"
+              "period": "list all Fiscal years",
+              "value": "list all Current ratio values for all periods"
             }
           ],
           "explanation": "Detailed analysis of short-term liquidity. Discuss working capital management, cash conversion cycle, and operational funding needs.",
