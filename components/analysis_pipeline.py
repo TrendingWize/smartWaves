@@ -1761,6 +1761,7 @@ def process_symbol_logic(
                     )
             except Exception as e_neo_save:
                 logger.error(f"Error saving NEW analysis to Neo4j for {symbol_to_process}: {e_neo_save}", exc_info=True)
+                print(f"NEO4J SAVE ERROR: {type(e_neo_save).__name__}: {e_neo_save}")
                 if isinstance(generated_analysis_json, dict): generated_analysis_json['error_neo4j_save'] = str(e_neo_save)
         
         if isinstance(generated_analysis_json, dict) and not any(k.startswith("error_") for k in generated_analysis_json):
