@@ -5,7 +5,8 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from functools import lru_cache, wraps
 from typing import Any, Dict, List, Optional, Union
-from datetime import datetime as dt_class, date, timedelta
+from datetime import datetime as dt_class, timedelta
+from datetime import date
 
 import requests
 
@@ -416,7 +417,7 @@ class FinancialDataModule:
         self,
         exchange: str,
         sector_name: str, # Renamed from sector to avoid conflict
-        anchor_date: Optional[str | date] = None,
+        anchor_date: Optional[str | date] = None
     ) -> Optional[List[Dict[str, Any]]]:
         target_date: Optional[dt_class.date] = None
         if anchor_date is None:
