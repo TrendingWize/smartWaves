@@ -1398,6 +1398,8 @@ def process_symbol_logic(
 - **earnings_yield_ttm**: TTM earnings yield (%)
 - **free_cash_flow_yield_ttm**: TTM FCF yield (%)
 - **peg_ratio_ttm**: TTM PEG ratio
+- **explanation**: Measures the company's valuation against key financial metrics, providing insight into market expectations, growth prospects, and relative value versus peers. Interpret with awareness of industry norms.
+- **classification**: Valuation (Undervalued/Fairly Valued/Overvalued)
 
 #### profitability_ratios
 - **roe_ttm**: TTM Return on Equity (%)
@@ -1406,6 +1408,8 @@ def process_symbol_logic(
 - **gross_margin_ttm**: TTM Gross Margin (%)
 - **ebitda_margin_ttm**: TTM EBITDA Margin (%)
 - **net_margin_ttm**: TTM Net Margin (%)
+- **explanation**: Assesses the company’s ability to generate earnings relative to revenue, assets, and equity. Use these ratios to gauge operational effectiveness, cost control, and pricing power.
+- **classification**: Profitability (High/Average/Low)
 
 #### liquidity_and_solvency_ratios
 - **debt_to_equity_ttm**: TTM Debt/Equity ratio
@@ -1413,6 +1417,8 @@ def process_symbol_logic(
 - **net_debt_to_ebitda_ttm**: TTM Net Debt/EBITDA ratio
 - **current_ratio_ttm**: TTM Current Ratio
 - **interest_coverage_ttm**: TTM Interest Coverage ratio
+- **explanation**: Evaluates short-term and long-term financial stability, including the company’s capacity to meet liabilities as they come due. Key for identifying distress risk and debt management.
+- **classification**: Solvency (Safe/Vulnerable/At Risk)
 
 #### efficiency_ratios
 - **days_sales_outstanding_ttm**: TTM DSO (days)
@@ -1420,11 +1426,15 @@ def process_symbol_logic(
 - **days_payables_outstanding_ttm**: TTM DPO (days)
 - **cash_conversion_cycle_ttm**: TTM CCC (days)
 - **asset_turnover_ttm**: TTM Asset Turnover
+- **explanation**: Analyzes how efficiently the company manages assets and liabilities, impacting cash flow and profitability. Key for benchmarking operational excellence against industry peers.
+- **classification**: Efficiency (Efficient/Average/Inefficient)
 
 #### growth_metrics_ttm
 - **revenue_growth_yoy_ttm**: TTM YoY Revenue Growth (%)
 - **ebitda_growth_yoy_ttm**: TTM YoY EBITDA Growth (%)
 - **eps_diluted_growth_yoy_ttm**: TTM YoY Diluted EPS Growth (%)
+- **explanation**: Tracks year-over-year expansion in revenue, profit, and earnings per share, providing signals for future performance and investor sentiment. Consider context (organic vs. acquisition-driven growth).
+- **classification**: Growth Trend (Accelerating/Stable/Declining)
 
 #### industry_sector_comparison
 - **sector_pe_average**: Sector average P/E ratio
