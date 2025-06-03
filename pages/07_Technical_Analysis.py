@@ -136,9 +136,11 @@ run_btn = col_btn.button("💡 Generate AI Analysis")
 
 # tradingview chart
 chart_theme = "dark" if theme == "auto" and st.get_option("theme.base") == "dark" else (theme if theme != "auto" else "light")
+
 tv_chart(tv_symbol, tv_int, chart_theme, height, None if autosz else 800, autosz)
 
 if run_btn:
+    cmp = save_composite_chart(df, tkr, frame)
     st.subheader("🖼️ Composite Price Chart (Python-generated)")
     st.image(cmp, caption=f"{tkr} – {frame} Composite Chart", use_column_width=True)
 
