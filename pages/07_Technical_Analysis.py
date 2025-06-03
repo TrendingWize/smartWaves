@@ -70,7 +70,7 @@ def save_composite_chart(df, tkr, frame):
         ax1.plot(df.index, df[sma], label=label)
     ax1.set_title(f"{tkr} ({frame}) – Price & SMAs")
     ax1.set_ylabel("Price (log scale)")
-    ax1.set_yscale("log")
+    ax1.set_ylabel("Price")
     ax1.legend()
     ax1.grid(True)
 
