@@ -9,6 +9,7 @@ from datetime import datetime as dt_class, timedelta
 from datetime import date
 from openai import OpenAI
 import requests
+import os
 
 # Config dataclass (if you want to keep config inside the module)
 from dataclasses import dataclass, field
