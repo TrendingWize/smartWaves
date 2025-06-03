@@ -81,7 +81,7 @@ OPENAI_CLIENT_INSTANCE = None
 NEO4J_DRIVER_INSTANCE = None # This should be managed by Streamlit's lifecycle
 
 # Function to initialize shared resources if not already done
-#@st.cache_resource(show_spinner="Initializing OpenAI Client for Report Pipeline...")
+@st.cache_resource(show_spinner="Initializing OpenAI Client for Report Pipeline...")
 def initialize_analysis_resources():
     global APP_CONFIG, FDM_MODULE_INSTANCE, OPENAI_CLIENT_INSTANCE, NEO4J_DRIVER_INSTANCE
 
