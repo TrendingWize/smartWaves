@@ -15,6 +15,12 @@ from dataclasses import dataclass, field
 
 logger = logging.getLogger("financial_data_module")
 
+def _redact(url: str, key: str) -> str:
+    """Redacts API key or sensitive value from a URL for safe logging."""
+    if not key:
+        return url
+    return url.replace(key, "***REDACTED***")
+
 @dataclass(slots=True, frozen=True)
 class Config:
     fmp_key: str
