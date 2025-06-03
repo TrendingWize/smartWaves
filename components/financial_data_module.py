@@ -228,7 +228,7 @@ class FinancialDataModule:
         tickers = [symbol, *peers]
         out: List[Dict[str, Any]] = []
         # Ensure DEFAULT_MAX_WORKERS is at least 1
-        max_workers_for_pool = max(1, DEFAULT_MAX_WORKERS)
+        #max_workers_for_pool = max(1, DEFAULT_MAX_WORKERS)
 
         with ThreadPoolExecutor(max_workers=max_workers_for_pool) as pool:
             fut_quotes = {
