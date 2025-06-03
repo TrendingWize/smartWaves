@@ -966,8 +966,8 @@ def save_analysis_to_neo4j(tx, symbol_param: str, analysis_report_data: Dict[str
         "total_tokens": analysis_report_data.get("total_tokens"),
         "analysis_generated_at_str": analysis_report_data.get("analysis_generated_at"), 
         "model_used": analysis_report_data.get("model_used"),
-        "symbol_processing_duration": analysis_report_data.get("symbol_processing_duration"),
-        "calendarYear": analysis_report_data.get("calendarYear"),
+        "symbol_processing_duration": analysis_report_data.get("symbol_processing_duration_total"),
+        "calendarYear": analysis_report_data.get("metadata", {}).get("calendarYear"),
     }
 
     # ---- START DETAILED LOGGING ----
@@ -1061,16 +1061,16 @@ def process_symbol_logic(
                 except json.JSONDecodeError as e: logger.error(f"Cache: Error decoding metadata_json for {symbol_to_process}: {e}"); return None
             else: logger.warning(f"Cache: Missing or invalid metadata_json for {symbol_to_process}."); return None
 
-            analysis_fillingDate_str = metadata_dict.get("fillingDate")
+            analysis_as_of_date_str = metadata_dict.get("as_of_date")
             report_node_filling_date_obj = report_node_data.get("fillingDate")
             report_node_filling_date_str = report_node_filling_date_obj.iso_format()[:10] if report_node_filling_date_obj and hasattr(report_node_filling_date_obj, 'iso_format') else None
 
-            logger.info(f"Cache Candidate for {symbol_to_process}: Node.fillingDate={report_node_filling_date_str}, Metadata.fillingDate={analysis_fillingDate_str}")
+            logger.info(f"Cache Candidate for {symbol_to_process}: Node.fillingDate={report_node_filling_date_str}, Metadata.as_of_date={analysis_as_of_date_str}")
 
-            # Core comparison: Prospective FMP fillingDate vs. cached analysis's fillingDate
-            if prospective_fmp_filling_date_str and analysis_fillingDate_str and \
-               prospective_fmp_filling_date_str == analysis_fillingDate_str:
-                logger.info(f"CACHE HIT: Prospective FMP Date ({prospective_fmp_filling_date_str}) matches Cached Analysis As-Of-Date ({analysis_fillingDate_str}).")
+            # Core comparison: Prospective FMP fillingDate vs. cached analysis's as_of_date
+            if prospective_fmp_filling_date_str and analysis_as_of_date_str and \
+               prospective_fmp_filling_date_str == analysis_as_of_date_str:
+                logger.info(f"CACHE HIT: Prospective FMP Date ({prospective_fmp_filling_date_str}) matches Cached Analysis As-Of-Date ({analysis_as_of_date_str}).")
                 
                 # Reconstruct the full report object
                 full_cached_report = {
@@ -1105,7 +1105,7 @@ def process_symbol_logic(
         if prospective_fmp_filling_date_str:
             cypher_for_cache_check = "MATCH (ar:AnalysisReport {symbol: $symbol_param, fillingDate: date($date_param)}) RETURN ar LIMIT 1"
             params_for_cache_check["date_param"] = prospective_fmp_filling_date_str
-        else: # Fallback if prospective date couldn't be determined, get latest and check its fillingDate
+        else: # Fallback if prospective date couldn't be determined, get latest and check its as_of_date
             cypher_for_cache_check = "MATCH (ar:AnalysisReport {symbol: $symbol_param}) RETURN ar ORDER BY ar.fillingDate DESC LIMIT 1"
 
         existing_analysis_report = neo4j_driver_instance.execute_query(
@@ -1172,8 +1172,8 @@ def process_symbol_logic(
     "industry": "Precise industry classification (string, e.g., \"Semiconductors\"). Pull from ‘metadata.industry’; if unavailable leave \"\".",
     "sector": "Broad GICS/NAICS sector (string, e.g., \"Technology\"). Pull from ‘metadata.sector’; if unavailable leave \"\".",
     "currency": "Reporting currency ISO code (string, e.g., \"USD\"). Pull from ‘metadata.currency’; if unavailable leave \"\".",
-    "fillingDate": "Date (YYYY‑MM‑DD) the snapshot metrics were captured. Pull from ‘metadata.fillingDate’; if unavailable leave \"\".",
-    "last_price": "Last closing price in ‘currency’ as of ‘fillingDate’ (number, 2‑4 decimals). Pull from ‘metadata.last_price’; if unavailable leave \"\".",
+    "as_of_date": "Date (YYYY‑MM‑DD) the snapshot metrics were captured. Pull from ‘metadata.as_of_date’; if unavailable leave \"\".",
+    "last_price": "Last closing price in ‘currency’ as of ‘as_of_date’ (number, 2‑4 decimals). Pull from ‘metadata.last_price’; if unavailable leave \"\".",
     "data_range_years": "Years covered by time‑series analysis (string, e.g., \"2019–2024\"). Pull from ‘metadata.data_range_years’; if unavailable leave \"\".",
     "analysis_generation_date": "Timestamp when this JSON was produced (RFC‑3339 string). Pull from ‘metadata.analysis_generation_date’; if unavailable leave \"\".",
     "sec_filing_link": "URL to most recent 10‑K/20‑F or equivalent. Pull from ‘metadata.sec_filing_link’; if unavailable leave \"\".",
@@ -1741,7 +1741,7 @@ def process_symbol_logic(
             if not isinstance(current_meta, dict): current_meta = {}
             current_meta['ticker'] = symbol_to_process
             current_meta['fillingDate'] = actual_fmp_filling_date_str # For Neo4j node key
-            current_meta['fillingDate'] = actual_fmp_filling_date_str  # For cache comparison consistency
+            current_meta['as_of_date'] = actual_fmp_filling_date_str  # For cache comparison consistency
             current_meta['calendarYear'] = fmp_company_data.get("metadata_package", {}).get("fmp_calendar_year")
             generated_analysis_json['metadata'] = current_meta
             
