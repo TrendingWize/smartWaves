@@ -1,13 +1,15 @@
 # pages/11_ask_ai_tab.py
 
 import streamlit as st
+st.set_page_config(page_title="Ask AI - Smart Waves", layout="wide")
+
 import os
 import openai
 from ask_neo4j import ask_neo4j_logic, initialize_llm_and_embeddings_askai
 from langchain_neo4j import Neo4jGraph
 
 # Page config
-st.set_page_config(page_title="Ask AI - Smart Waves", layout="wide")
+
 st.markdown("## 🤖 Ask AI")
 st.markdown("Ask anything about financial data, filings, or related entities.")
 
