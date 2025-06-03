@@ -16,10 +16,11 @@ from dataclasses import dataclass, field
 @dataclass(slots=True, frozen=True)
 class Config:
     fmp_key: str
+    fmp_key: str
     openai_key: str = ""
-    neo4j_uri=NEO4J_URI
-    neo4j_user=NEO4J_USER
-    neo4j_password=NEO4J_PASSWORD
+    neo4j_uri: str = ""
+    neo4j_user: str = ""
+    neo4j_password: str = ""
     user_agent: str = "TrendingWizeAnalysis/2.0"
     price_look_forward: int = 7
     retry_attempts: int = 3
