@@ -1,85 +1,87 @@
 # pages/11_ask_ai_tab.py
 
 import streamlit as st
-# Page config
 st.set_page_config(page_title="Ask AI - Smart Waves", layout="wide")
 
-import os
 import openai
+import os
+from ask_neo4j import ask_neo4j_logic
 from langchain_neo4j import Neo4jGraph
-from ask_neo4j import ask_neo4j_logic, initialize_llm_and_embeddings_askai
+from ask_neo4j import (
+    initialize_llm_and_embeddings_askai,
+    ask_neo4j_logic,
+    NEO4J_URI_ASKAI,
+    NEO4J_USERNAME_ASKAI,
+    NEO4J_PASSWORD_ASKAI
+)
 
-
-st.markdown("## 🤖 Ask AI (Dual Analysis)")
-st.markdown("Ask one question and get responses from both GPT-4 and Gemini.")
+# --- Configure Streamlit page ---
+st.markdown("## 🤖 Ask AI")
+st.markdown("Ask anything about financial data, filings, or related entities.")
 
 # Load credentials
 NEO4J_URI = st.secrets.get("NEO4J_URI") or os.getenv("NEO4J_URI")
 NEO4J_USERNAME = st.secrets.get("NEO4J_USER") or os.getenv("NEO4J_USER")
 NEO4J_PASSWORD = st.secrets.get("NEO4J_PASSWORD") or os.getenv("NEO4J_PASSWORD")
 OPENAI_MODEL = st.secrets.get("OPENAI_MODEL", "gpt-4o")  # Default model
-GOOGLE_API_KEY = st.secrets.get("GOOGLE_API_KEY") or os.getenv("GOOGLE_API_KEY")
 
-# Connect to Neo4j
+# ✅ Initialize graph
 graph = Neo4jGraph(
     url=NEO4J_URI,
     username=NEO4J_USERNAME,
     password=NEO4J_PASSWORD,
 )
 
-# UI: Single input for both models
-question = st.text_input("Ask your financial question:", placeholder="e.g., What are the top risks facing Apple in 2024?")
-submitted = st.button("🔍 Analyze with GPT-4 & Gemini")
+# Initialize LLM and vector store
+llm_provider = 'openai'
+llm, embeddings, llm_provider = initialize_llm_and_embeddings_askai(llm_provider)
+client = openai.OpenAI()
+
+# --- Chat UI Layout ---
+st.markdown("### 💬 Chat")
+
+with st.form("chat_form"):
+    question = st.text_input("Ask your question:")
+    submitted = st.form_submit_button("Send")
 
 if submitted and question:
-    with st.spinner("🔄 Fetching context from Neo4j..."):
-        try:
-            # Initialize for GPT-4
-            llm_gpt, embeddings_gpt, _ = initialize_llm_and_embeddings_askai("openai")
-            context_gpt = ask_neo4j_logic(graph, question, llm_gpt, embeddings_gpt, "openai", explain_flag=True)
+    try:
+        # Step 1: Get context from Neo4j
+        context = ask_neo4j_logic(
+            graph_instance=graph,
+            question_text=question,
+            llm_instance=llm,
+            embeddings_instance=embeddings,
+            llm_provider_name=llm_provider,
+            explain_flag=True
+        )
 
-            # Initialize for Gemini
-            llm_gemini, embeddings_gemini, _ = initialize_llm_and_embeddings_askai("gemini")
-            context_gemini = ask_neo4j_logic(graph, question, llm_gemini, embeddings_gemini, "gemini", explain_flag=True)
+        # Step 2: Compose single-turn message
+        full_prompt = f"{context}\n\nUser question:\n{question}"
 
-        except Exception as e:
-            st.error(f"❌ Failed to generate context: {e}")
-            st.stop()
+        # Step 3: Stream OpenAI response
+        stream = client.chat.completions.create(
+            model=OPENAI_MODEL,
+            messages=[{"role": "user", "content": full_prompt}],
+            stream=True,
+            temperature=0.3
+        )
 
-    # Columns for parallel output
-    col1, col2 = st.columns(2)
+        # Step 4: Stream output
+        response_box = st.empty()
+        full_response = ""
+        buffer = ""
+        counter = 0
+        for chunk in stream:
+            delta = chunk.choices[0].delta.content or ""
+            buffer += delta
+            counter += 1
+            if counter % 5 == 0:
+                full_response += buffer
+                response_box.markdown(f"🤖 **AI:** {full_response}", unsafe_allow_html=True)
+                buffer = ""
+        full_response += buffer
+        response_box.markdown(f"🤖 **AI:** {full_response}", unsafe_allow_html=True)
 
-    with col1:
-        st.subheader("🧠 GPT-4 Response")
-        try:
-            client = openai.OpenAI()
-            stream = client.chat.completions.create(
-                model=st.secrets.get("OPENAI_MODEL", "gpt-4o"),
-                messages=[{"role": "user", "content": f"{context_gpt}\n\nUser question:\n{question}"}],
-                stream=True,
-                temperature=0.3
-            )
-            gpt_box = st.empty()
-            gpt_answer, buffer, counter = "", "", 0
-            for chunk in stream:
-                delta = chunk.choices[0].delta.content or ""
-                buffer += delta
-                counter += 1
-                if counter % 5 == 0:
-                    gpt_answer += buffer
-                    gpt_box.markdown(gpt_answer)
-                    buffer = ""
-            gpt_answer += buffer
-            gpt_box.markdown(gpt_answer)
-        except Exception as e:
-            st.error(f"❌ GPT-4 Error: {e}")
-
-    with col2:
-        st.subheader("🌟 Gemini Response")
-        try:
-            import google.generativeai as genai
-            gemini = genai.GenerativeModel("gemini-pro")
-            response = gemini.generate_content(f"{context_gemini}\n\nUser question:\n{question}")
-            st.markdown(response.text)
-        except Exception as e:
-            st.error(f"❌ Gemini Error: {e}")
+    except Exception as e:
+        st.error(f"⚠️ Error: {e}")
