@@ -1,13 +1,15 @@
 # pages/11_ask_ai_tab.py
 
 import streamlit as st
+st.set_page_config(page_title="Ask AI - Smart Waves", layout="wide")
+
+
 import os
 import openai
 from langchain_neo4j import Neo4jGraph
 from ask_neo4j import ask_neo4j_logic, initialize_llm_and_embeddings_askai
 
 # Page config
-st.set_page_config(page_title="Ask AI - Smart Waves", layout="wide")
 st.markdown("## 🤖 Ask AI (Dual Analysis)")
 st.markdown("Ask one question and get responses from both GPT-4 and Gemini.")
 
