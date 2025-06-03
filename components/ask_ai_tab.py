@@ -43,7 +43,7 @@ llm, vectorstore = initialize_llm_and_embeddings_askai('openai')
 def ask_ai_tab_content():
     st.markdown("## 🤖 Ask AI")
 
-    tab1, tab2 = st.tabs(["🧠 GPT-4", "🌟 Gemini"])
+    tab1, tab2 = st.tabs(["🧠 o3", "🌟 Gemini"])
 
     with tab1:
         run_ask_ai_ui("openai")
@@ -102,7 +102,7 @@ def run_ask_ai_ui(provider: str):
                     import openai
                     client = openai.OpenAI()
                     stream = client.chat.completions.create(
-                        model=st.secrets.get("OPENAI_MODEL", "gpt-4o"),
+                        model="o3",
                         messages=[{"role": "user", "content": prompt}],
                         stream=True,
                         temperature=0.3
