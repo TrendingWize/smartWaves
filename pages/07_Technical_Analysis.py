@@ -88,7 +88,7 @@ tv_int  =c_int.selectbox("TV interval",["1","15","30","60","D","W","M"],4)
 height=st.slider("Chart height (px)",400,1000,750)
 
 # new row: autosize | theme | button
-col_auto,col_theme,col_btn=st.columns([1,1,1])
+col_auto,col_theme,col_btn=st.columns([1,10,1])
 autosz=col_auto.checkbox("Autosize width",True)
 theme =col_theme.radio("Theme",["auto","light","dark"],horizontal=True)
 run_btn=col_btn.button("💡 Generate AI Analysis")
