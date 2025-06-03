@@ -164,7 +164,8 @@ async def _answer_one(q:str, tk:str,
     prompt = textwrap.dedent(f"""
         You are a precise financial analyst.
         Use ONLY the context provided to answer the question. youre resonse **MUST** be as Markdown format.
-        Use appropriat Markdown formating for the answer like title, headings, tables etc...
+        Use appropriat Markdown formating for the answer like title, headings, tables etc... questions always as a heading (#). 
+        after the answer add classfication (positiv, negative, sever negative etc...) use green color for positive and red colour for negative and sever negative.
         Question: {q}
         <CONTEXT>
         {context}
