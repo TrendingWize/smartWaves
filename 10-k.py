@@ -34,7 +34,7 @@ CHAT_MODEL        = "gpt-4o-mini"
 EMBED_TOKEN_LIMIT = 800
 EMBED_BATCH       = 128
 TOP_K             = 5          # chunks retrieved per question
-MAX_CONCURRENT_Q  = 5
+MAX_CONCURRENT_Q  = 10
 REQUEST_TIMEOUT   = 30.0
 
 SEC_HEADERS = {
