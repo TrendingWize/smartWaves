@@ -66,8 +66,6 @@ period_back = 0
 config = Config(fmp_key="YOUR_FMP_KEY")
 fdm = FinancialDataModule(config)
 
-PROMPT_PATH = "financial_analysis_prompt.md"
-instructions = load_prompt_instruction(PROMPT_PATH)
 
 def load_prompt_instruction(md_path: str) -> str:
     with open(md_path, "r", encoding="utf-8") as f:
