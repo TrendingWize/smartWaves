@@ -113,10 +113,10 @@ if run_btn:
         cmp=save_composite_chart(df,tkr,frame)
         prompt=textwrap.dedent(f"""
 **Role:** Expert Market Technician specializing in pure price action analysis. You master Elliott Wave theory, Wyckoff methodology, 
-and classical chart patterns. All analysis must derive exclusively from **price structure, volume, and market geometry**.  
+and classical chart patterns. All analysis must derive exclusively from **price structure, volume, and market geometry**. Response in {c_language} language.
 
 **Absolute Rules:**  
-✅ Prioritize: Candlestick patterns, volume-profile, swing structure, and institutional accumulation/distribution signs  
+✅ Prioritize: Candlestick patterns, volume-profile, swing structure, and institutional accumulation/distribution signs  .
 
 ---
 
