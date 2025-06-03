@@ -77,12 +77,13 @@ def tv_chart(sym,interval,theme,height,width,autosize):
 # ── UI ──────────────────────────────────────────────────────────────────────
 st.title("📈 Technical Analysis – Interactive & AI Insights")
 
-c_sym,c_from,c_to,c_frm,c_int=st.columns([3,2,2,2,2])
+c_sym,c_from,c_to,c_frm,c_int,c_language=st.columns([3,2,2,2,2,2])
 tv_symbol=c_sym.text_input("TradingView Symbol","NASDAQ:AAPL").upper().strip()
 today=dt.date.today()
 date_from=c_from.date_input("From",today-dt.timedelta(days=365))
 date_to  =c_to.date_input("To",today)
 frame   =c_frm.selectbox("Indicator frame",["Daily","Weekly","Monthly"])
+c_languagec  =c_languagec.selectbox("Indicator frame",["Arabic","English"])
 tv_int  =c_int.selectbox("TV interval",["1","15","30","60","D","W","M"],4)
 
 height=st.slider("Chart height (px)",400,1000,750)
