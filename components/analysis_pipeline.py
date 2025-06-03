@@ -86,17 +86,12 @@ def initialize_analysis_resources():
     global APP_CONFIG, FDM_MODULE_INSTANCE, OPENAI_CLIENT_INSTANCE, NEO4J_DRIVER_INSTANCE
 
     if APP_CONFIG is None:
-        # Load FMP_API_KEY and OPENAI_API_KEY from Streamlit secrets or os.environ
-        # For this example, let's assume they are set in os.environ as in your original script
         os.environ["FMP_API_KEY"] = FMP_API_KEY
         os.environ["OPENAI_API_KEY"] = OPENAI_API_KEY
-
-        # Neo4j credentials also from os.environ or st.secrets
         os.environ["NEO4J_URI"] = NEO4J_URI
         os.environ["NEO4J_USER"] = NEO4J_USER
         os.environ["NEO4J_PASSWORD"] = NEO4J_PASSWORD
-
-        APP_CONFIG = Config() # Your Config class from the script
+        APP_CONFIG = Config()
 
     if FDM_MODULE_INSTANCE is None and APP_CONFIG:
         FDM_MODULE_INSTANCE = FinancialDataModule(config=APP_CONFIG)
@@ -107,12 +102,31 @@ def initialize_analysis_resources():
             logger.info("OpenAI client initialized for analysis pipeline.")
         except Exception as e:
             logger.error(f"Failed to initialize OpenAI client in pipeline: {e}")
-            OPENAI_CLIENT_INSTANCE = None # Ensure it's None if init fails
-    
-    # NEO4J_DRIVER_INSTANCE should ideally be managed by Streamlit's @st.cache_resource
-    # and passed into generate_ai_report if needed, or re-fetched inside.
-    # For now, let's assume process_symbol_logic can use a globally available or passed driver.
+            OPENAI_CLIENT_INSTANCE = None
 
+    # --- ADDED/MODIFIED SECTION FOR NEO4J DRIVER ---
+    if NEO4J_DRIVER_INSTANCE is None and APP_CONFIG: # Check if already initialized
+        if GraphDatabase and APP_CONFIG.neo4j_uri and APP_CONFIG.neo4j_user and APP_CONFIG.neo4j_password: # Ensure GraphDatabase is imported and config exists
+            try:
+                logger.info(f"Attempting to initialize Neo4j driver for URI: {APP_CONFIG.neo4j_uri}")
+                NEO4J_DRIVER_INSTANCE = GraphDatabase.driver(
+                    APP_CONFIG.neo4j_uri,
+                    auth=(APP_CONFIG.neo4j_user, APP_CONFIG.neo4j_password)
+                )
+                NEO4J_DRIVER_INSTANCE.verify_connectivity()
+                logger.info("Neo4j driver initialized successfully globally via initialize_analysis_resources.")
+            except Exception as e:
+                logger.error(f"Failed to initialize global Neo4j driver in pipeline: {e}", exc_info=True)
+                NEO4J_DRIVER_INSTANCE = None # Ensure it's None if init fails
+        else:
+            missing_details = []
+            if not GraphDatabase: missing_details.append("neo4j library not imported")
+            if not APP_CONFIG.neo4j_uri: missing_details.append("NEO4J_URI missing")
+            if not APP_CONFIG.neo4j_user: missing_details.append("NEO4J_USER missing")
+            if not APP_CONFIG.neo4j_password: missing_details.append("NEO4J_PASSWORD missing") # Added check
+            logger.warning(f"Neo4j driver not initialized globally. Missing: {', '.join(missing_details)}.")
+            NEO4J_DRIVER_INSTANCE = None # Explicitly set to None
+    # --- END OF ADDED/MODIFIED SECTION ---
 
 # --- Main function to be called by Streamlit ---
 def generate_ai_report(
