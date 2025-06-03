@@ -71,7 +71,8 @@ def load_prompt_instruction(md_path: str) -> str:
     with open(md_path, "r", encoding="utf-8") as f:
         return f.read()
 
-PROMPT_PATH = "annual_analysis_instructions.md"  
+
+PROMPT_PATH = os.path.join(os.path.dirname(__file__), "annual_analysis_instructions.md")
 PROMPT_INSTRUCTION = load_prompt_instruction(PROMPT_PATH)
 
 def initialize_analysis_resources():
