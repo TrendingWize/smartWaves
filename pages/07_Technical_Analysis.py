@@ -113,8 +113,8 @@ if run_btn:
         prompt=textwrap.dedent(f"""
             You are a professional market technician.
             Analyse this {frame.lower()} composite chart of {tkr}
-            (log close, SMAs, volume, MACD, RSI). Provide trend, support/resistance,
-            and price targets for +30, +60, +252 trading days (bullish / base / bearish).
+            (log close, SMAs, volume, MACD, RSI). Provide trend, support/resistance, identify any chart patterns
+            and price targets for +30, +60, +252 trading days and the current trend (bullish / base / bearish).
         """)
         with st.spinner("Gemini is thinking …"):
             st.subheader("🧠 Gemini Commentary")
