@@ -202,3 +202,9 @@ if run_btn:
 
     except Exception as e:
         st.error(f"Error: {e}")
+
+if Path(p).exists():
+    st.success(f"✅ Chart saved to {p}")
+else:
+    st.error(f"❌ Failed to save chart to {p}")
+
