@@ -17,6 +17,14 @@ import pandas as pd
 import streamlit as st
 from .financial_data_module import FinancialDataModule, Config
 
+
+FMP_API_KEY  = st.secrets.get("FMP_API_KEY") or os.getenv("FMP_API_KEY", "")
+OPENAI_API_KEY  = st.secrets.get("OPENAI_API_KEY") or os.getenv("OPENAI_API_KEY", "")
+
+NEO4J_URI = st.secrets.get("NEO4J_URI") or os.getenv("NEO4J_URI")
+NEO4J_USER = st.secrets.get("NEO4J_USER") or os.getenv("NEO4J_USER")
+NEO4J_PASSWORD = st.secrets.get("NEO4J_PASSWORD") or os.getenv("NEO4J_PASSWORD")
+
 APP_CONFIG = Config(
     fmp_key=FMP_API_KEY,
     openai_key=OPENAI_API_KEY,
