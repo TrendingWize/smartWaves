@@ -111,10 +111,52 @@ if run_btn:
             df =add_indicators(resample(raw,frame))
         cmp=save_composite_chart(df,tkr,frame)
         prompt=textwrap.dedent(f"""
-            You are a professional market technician.
-            Analyse this {frame.lower()} composite chart of {tkr}
-            (log close, SMAs, volume, MACD, RSI). Provide trend, support/resistance, identify any chart patterns
-            and price targets for +30, +60, +252 trading days and the current trend (bullish / base / bearish).
+            **Role:** Expert Market Technician specializing in pure price action analysis. You master Elliott Wave theory, Wyckoff methodology, and classical chart patterns. All analysis must derive exclusively from **price structure, volume, and market geometry**.  
+
+**Absolute Rules:**  
+❌ Never use indicators (SMA/MACD/RSI)  
+✅ Prioritize: Candlestick patterns, volume-profile, swing structure, and institutional accumulation/distribution signs  
+
+---
+
+**Analysis Task:**  
+Analyze the {timeframe} composite chart of {ticker} (Price + Volume only). Structure your response:  
+
+#### 1. **Market Structure Framework**  
+- **Trend Identification:**  
+  - Primary trend direction (bullish/bearish/neutral) using *swing highs/lows*  
+  - Key market phase (Accumulation/Markup/Distribution/Decline) via **Wyckoff principles**  
+- **Critical Levels:**  
+  - 3 near-term support/resistance zones (price + volume confluence)  
+  - Major historical pivots affecting current structure  
+
+#### 2. **Pattern Recognition**  
+- **Classical Patterns:**  
+  - Flagged instances of: Cup & Handle, Head & Shoulders, Triangles, Channels  
+  - Pattern validity assessment (volume confirmation, breakout strength)  
+- **Elliott Wave Count:**  
+  - Current probable wave position (e.g., "Wave 3 of impulse")  
+  - Alternate counts with confidence %  
+- **Candlestick Signals:**  
+  - High-probability reversal/continuation clusters (e.g., 3-bar plays)  
+
+#### 3. **Projections & Risk Zones**  
+- **Price Targets (+30d/+60d/+252d):**  
+  - Measured moves from patterns  
+  - Fibonacci extensions (impulse waves)  
+  - Volume-profile HVN/LVN targets  
+- **Failure Scenarios:**  
+  - Key breakdown levels invalidating analysis  
+  - Stop-loss placement zones (price + volume voids)  
+
+#### 4. **Synthesis**  
+- **Current Bias:** Bullish/Base/Bearish (scale 1-5 conviction)  
+- **Optimal Entry Triggers:**  
+  - Breakout/retest levels with volume filters  
+  - Early reversal signals (wick rejections, volume spikes)  
+- **Timeframe Alignment:**  
+  - Conflicting signals across timeframes (if any)  
+
         """)
         with st.spinner("Gemini is thinking …"):
             st.subheader("🧠 Gemini Commentary")
