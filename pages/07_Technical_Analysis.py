@@ -23,7 +23,8 @@ st.markdown("""
 FMP_API_KEY     = st.secrets.get("FMP_API_KEY")
 GOOGLE_API_KEY  = st.secrets.get("GOOGLE_API_KEY")
 OPENAI_API_KEY  = st.secrets.get("OPENAI_API_KEY")
-OUT_DIR         = Path("charts"); OUT_DIR.mkdir(exist_ok=True)
+OUT_DIR = Path(__file__).parent / "charts"
+OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 openai.api_key = OPENAI_API_KEY
 
