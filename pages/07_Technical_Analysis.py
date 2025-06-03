@@ -126,7 +126,7 @@ height = st.slider("Chart height (px)", 400, 1000, 750)
 col_auto, col_theme, col_btn = st.columns([1, 3, 1])
 autosz  = col_auto.checkbox("Autosize width", True)
 theme   = col_theme.radio("Theme", ["auto", "light", "dark"], horizontal=True)
-run_btn = col_btn.button("\ud83d\udca1 Generate AI Analysis")
+run_btn = col_btn.button(" Generate AI Analysis")
 
 # tradingview chart
 tkr = re.split(r"[:/]", tv_symbol)[-1]
