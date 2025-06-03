@@ -1,5 +1,3 @@
-# smart_waves/pages/07_Technical_Analysis.py
-
 import streamlit as st
 st.set_page_config(page_title="Technical Analysis", layout="wide")
 
@@ -23,7 +21,7 @@ st.markdown("""
 FMP_API_KEY     = st.secrets.get("FMP_API_KEY")
 GOOGLE_API_KEY  = st.secrets.get("GOOGLE_API_KEY")
 OPENAI_API_KEY  = st.secrets.get("OPENAI_API_KEY")
-OUT_DIR = Path(__file__).parent / "charts"
+OUT_DIR         = Path(__file__).parent / "charts"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 openai.api_key = OPENAI_API_KEY
@@ -67,10 +65,6 @@ def save_composite_chart(df, tkr, frame):
     path = OUT_DIR / f"{tkr}_{frame}_cmp.png"
     fig.tight_layout(); fig.savefig(path, dpi=120); plt.close(fig)
     return str(path)
-    if Path(p).exists():
-        st.success(f"✅ Chart saved to {p}")
-    else:
-        st.error(f"❌ Failed to save chart to {p}")
 
 def ask_gemini(img, prompt):
     genai.configure(api_key=GOOGLE_API_KEY)
@@ -79,7 +73,7 @@ def ask_gemini(img, prompt):
 
 def ask_gpt(img, prompt):
     image_data = b64encode(open(img, "rb").read()).decode()
-    return openai.chat.completions.create(
+    return openai.ChatCompletion.create(
         model="gpt-4o",
         messages=[
             {"role": "system", "content": "You are a technical analysis expert."},
@@ -114,7 +108,7 @@ def tv_chart(sym, interval, theme, height, width, autosize):
     """, height=height, width=None if autosize else width or 800, scrolling=False)
 
 # ── UI ──────────────────────────────────────────────────────────────────────
-st.title("📈 Technical Analysis – Interactive & AI Insights")
+st.title("\ud83d\udcc8 Technical Analysis – Interactive & AI Insights")
 
 # language selector
 c_language = st.selectbox("Language", ["Arabic", "English"])
@@ -132,17 +126,12 @@ height = st.slider("Chart height (px)", 400, 1000, 750)
 col_auto, col_theme, col_btn = st.columns([1, 3, 1])
 autosz  = col_auto.checkbox("Autosize width", True)
 theme   = col_theme.radio("Theme", ["auto", "light", "dark"], horizontal=True)
-run_btn = col_btn.button("💡 Generate AI Analysis")
+run_btn = col_btn.button("\ud83d\udca1 Generate AI Analysis")
 
 # tradingview chart
+tkr = re.split(r"[:/]", tv_symbol)[-1]
 chart_theme = "dark" if theme == "auto" and st.get_option("theme.base") == "dark" else (theme if theme != "auto" else "light")
-
 tv_chart(tv_symbol, tv_int, chart_theme, height, None if autosz else 800, autosz)
-
-if run_btn:
-    cmp = save_composite_chart(df, tkr, frame)
-    st.subheader("🖼️ Composite Price Chart (Python-generated)")
-    st.image(cmp, caption=f"{tkr} – {frame} Composite Chart", use_column_width=True)
 
 # AI Analysis
 if run_btn:
@@ -154,13 +143,17 @@ if run_btn:
         st.info("Add FMP_API_KEY, GOOGLE_API_KEY, and OPENAI_API_KEY to secrets")
         st.stop()
 
-    tkr = re.split(r"[:/]", tv_symbol)[-1]
     try:
         with st.spinner("Fetching price data …"):
             raw = get_ohlcv(tkr, date_from.isoformat(), date_to.isoformat())
             df = add_indicators(resample(raw, frame))
-        cmp = save_composite_chart(df, tkr, frame)
 
+        # Save + show chart
+        cmp = save_composite_chart(df, tkr, frame)
+        st.subheader("🖼️ Composite Price Chart (Python-generated)")
+        st.image(cmp, caption=f"{tkr} – {frame} Composite Chart", use_column_width=True)
+
+        # Prompt
         prompt = textwrap.dedent(f"""
         **Role:** Expert Market Technician specializing in pure price action analysis. You master Elliott Wave theory, Wyckoff methodology, 
         and classical chart patterns. All analysis must derive exclusively from **price structure, volume, and market geometry**. Response in {c_language} language.
@@ -187,13 +180,14 @@ if run_btn:
         - **Timeframe Alignment:** conflicts if any
         """)
 
+        # Tabs
         tabs = st.tabs(["Gemini", "GPT"])
         with tabs[0]:
             with st.spinner("Gemini is thinking …"):
                 gemini_response = ask_gemini(cmp, prompt)
                 if c_language.lower() == "arabic":
                     st.markdown(
-                        f"""<div dir="rtl" style="text-align: right; font-family: 'Cairo', sans-serif;">{gemini_response}</div>""",
+                        f"""<div dir=\"rtl\" style=\"text-align: right; font-family: 'Cairo', sans-serif;\">{gemini_response}</div>""",
                         unsafe_allow_html=True
                     )
                 else:
@@ -204,7 +198,7 @@ if run_btn:
                 gpt_response = ask_gpt(cmp, prompt)
                 if c_language.lower() == "arabic":
                     st.markdown(
-                        f"""<div dir="rtl" style="text-align: right; font-family: 'Cairo', sans-serif;">{gpt_response}</div>""",
+                        f"""<div dir=\"rtl\" style=\"text-align: right; font-family: 'Cairo', sans-serif;\">{gpt_response}</div>""",
                         unsafe_allow_html=True
                     )
                 else:
@@ -212,6 +206,3 @@ if run_btn:
 
     except Exception as e:
         st.error(f"Error: {e}")
-
-
-
