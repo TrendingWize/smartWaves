@@ -68,9 +68,9 @@ def save_composite_chart(df, tkr, frame):
     fig.tight_layout(); fig.savefig(path, dpi=120); plt.close(fig)
     return str(path)
     if Path(p).exists():
-    st.success(f"✅ Chart saved to {p}")
-else:
-    st.error(f"❌ Failed to save chart to {p}")
+        st.success(f"✅ Chart saved to {p}")
+    else:
+        st.error(f"❌ Failed to save chart to {p}")
 
 def ask_gemini(img, prompt):
     genai.configure(api_key=GOOGLE_API_KEY)
