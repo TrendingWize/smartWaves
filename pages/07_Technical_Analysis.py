@@ -74,7 +74,7 @@ def ask_gemini(img, prompt):
 
 def ask_gpt(img, prompt):
     image_data = b64encode(open(img, "rb").read()).decode()
-    return openai.ChatCompletion.create(
+    return openai.chat.completions.create(
         model="gpt-4o",
         messages=[
             {"role": "system", "content": "You are a technical analysis expert."},
