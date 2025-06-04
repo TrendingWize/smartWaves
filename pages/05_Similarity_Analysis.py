@@ -1,12 +1,13 @@
 # pages/05_Similarity_Analysis.py
 import streamlit as st
+st.set_page_config(page_title="Fundamental Similarity Analysis", layout="wide")
+
 from components.similar_companies_tab import similar_companies_tab_content
 from utils import initialize_session_state, check_concurrent_login
 from utils import get_neo4j_driver, fetch_sector_list, fetch_company_preview  # Fixed import
 
 # Initialize session state
 initialize_session_state()
-st.set_page_config(page_title="Fundamental Similarity Analysis", layout="wide")
 
 # Authentication check
 if not st.session_state.logged_in:
