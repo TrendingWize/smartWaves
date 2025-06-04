@@ -1,5 +1,5 @@
 import streamlit as st
-from utils import login_user, initialize_session_state, check_concurrent_login
+from utils.user_auth import login_user, initialize_session_state, check_concurrent_login
 from streamlit import switch_page
 
 # Initialize session
