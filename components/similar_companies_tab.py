@@ -4,7 +4,7 @@ import numpy as np
 import inspect
 from datetime import datetime
 from typing import Dict, List, Tuple, Any
-from utils import (
+from utils.utils_helpers import (
     get_neo4j_driver,
     get_nearest_aggregate_similarities,
     fetch_financial_details_for_companies,
