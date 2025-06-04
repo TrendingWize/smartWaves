@@ -212,7 +212,7 @@ def similar_companies_tab_content() -> None:
                         'k': k + 5,  # Over-fetch for filtering
                         'sectors': selected_sectors,
                         'weight_scheme': weight_value,
-                        'decay': decay_lambda if weight_value == 'decay' else None,
+                        #'decay': decay_lambda if weight_value == 'decay' else None,
                         'normalize': True  # Ensure vector normalization
                     }
                     
