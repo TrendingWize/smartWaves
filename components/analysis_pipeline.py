@@ -343,4 +343,4 @@ def process_symbol_logic(
             generated_analysis_json['analysis_generated_at'] = datetime.datetime.now(datetime.timezone.utc).isoformat()
             generated_analysis_json['symbol_processing_duration_total'] = time.time() - start_ts
 
-            current_meta = generated_analysis_json.get('metadata',
+            current_meta = generated_analysis_json.get('metadata',)
