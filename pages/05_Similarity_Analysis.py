@@ -1,8 +1,8 @@
 # pages/05_Similarity_Analysis.py
-
 import streamlit as st
 from components.similar_companies_tab import similar_companies_tab_content
-from utils.utils_helpers import initialize_session_state, check_concurrent_login, get_neo4j_driver, fetch_sector_list, fetch_company_preview
+from utils.utils_helpers import initialize_session_state, check_concurrent_login
+from utils import get_neo4j_driver, fetch_sector_list, fetch_company_preview  # Fixed import
 
 # Initialize session state
 initialize_session_state()
