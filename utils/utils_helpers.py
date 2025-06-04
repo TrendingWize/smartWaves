@@ -43,54 +43,78 @@ def fetch_market_cap_classes(driver) -> List[str]:
     # No explicit driver.close() here as it's managed by @st.cache_resource or passed externally
 
 # --- Vector Loader with Filtering ---
-@st.cache_data(ttl="1h")
-@st.cache_data(ttl="1h")
+@st.cache_data(ttl="12h")
 def load_vectors_for_similarity(
-    _driver, # <--- RENAMED driver to _driver
+    _driver,
     year: int,
     family: str = "cf_vec_",
-    sectors: List[str] = None,
-    cap_classes: List[str] = None,
+    sectors: Optional[List[str]] = None,      # Make Optional explicit
+    cap_classes: Optional[List[str]] = None,  # Make Optional explicit
     target_sym: str = None
-) -> Tuple[Optional[np.ndarray], Dict[str, Tuple[np.ndarray, str, str]]]: # Return type updated
-    if not _driver: # Check the renamed argument
+) -> Tuple[Optional[np.ndarray], Dict[str, Tuple[np.ndarray, str, str]]]:
+    if not _driver:
         st.error("Neo4j driver not provided to load_vectors_for_similarity.")
         return None, {}
-    # ... rest of the function, ensuring you use _driver internally ...
+    if not target_sym:
+        st.error("Target symbol not provided to load_vectors_for_similarity.")
+        return None, {}
+
     prop = f"{family}{year}"
-    where_clauses = [f"c.`{prop}` IS NOT NULL", "c.ipoDate IS NOT NULL"]
-    params = {} # Removed prop_name as it's not used in a parameterized way in query string
+    target_vector: Optional[np.ndarray] = None
+    candidate_vecs_data: Dict[str, Tuple[np.ndarray, str, str]] = {}
 
-    if sectors:
-        where_clauses.append("c.sector IN $sectors")
-        params["sectors"] = sectors
-    if cap_classes:
-        where_clauses.append("c.marketCapClass IN $cap_classes")
-        params["cap_classes"] = cap_classes
-
-    where_str = " AND ".join(where_clauses)
-    query = f"""
-        MATCH (c:Company)
-        WHERE {where_str}
-        RETURN c.symbol AS sym, c.`{prop}` AS vec, c.sector AS sector, c.marketCapClass AS cap_class
+    # Step 1: Fetch the target company's vector unconditionally (for its specific embedding property)
+    target_query = f"""
+        MATCH (t:Company {{symbol: $target_sym}})
+        WHERE t.`{prop}` IS NOT NULL
+        RETURN t.`{prop}` AS vec
+        LIMIT 1
     """
     try:
         with _driver.session(database="neo4j") as session:
-            results = session.run(query, **params) # Pass parameters correctly
-            all_vecs_data = {
-                r["sym"]: (np.asarray(r["vec"], dtype=np.float32), r["sector"], r["cap_class"])
-                for r in results if r["vec"] is not None
-            }
-            
-            target_data = all_vecs_data.get(target_sym)
-            target_vector = target_data[0] if target_data and target_data[0] is not None else None # Ensure vec exists
-            
-            candidate_vecs_data = {
-                sym: data for sym, data in all_vecs_data.items() if sym != target_sym and data[0] is not None # Ensure vec exists
-            }
-            return target_vector, candidate_vecs_data
+            result = session.run(target_query, target_sym=target_sym)
+            record = result.single()
+            if record and record["vec"]:
+                target_vector = np.asarray(record["vec"], dtype=np.float32)
+            else:
+                # st.info(f"No vector '{prop}' found for target {target_sym} in year {year}.") # Can be noisy
+                return None, {} # If target vector for the year isn't found, can't proceed for this year
+
+        # Step 2: Fetch candidate companies, applying filters
+        candidate_where_clauses = [
+            f"c.symbol <> $target_sym", # Exclude target from candidates
+            f"c.`{prop}` IS NOT NULL",
+            "c.ipoDate IS NOT NULL"
+        ]
+        params_candidate = {"target_sym": target_sym}
+
+        if sectors:
+            candidate_where_clauses.append("c.sector IN $sectors")
+            params_candidate["sectors"] = sectors
+        if cap_classes:
+            candidate_where_clauses.append("c.marketCapClass IN $cap_classes")
+            params_candidate["cap_classes"] = cap_classes
+
+        candidate_where_str = " AND ".join(candidate_where_clauses)
+        candidate_query = f"""
+            MATCH (c:Company)
+            WHERE {candidate_where_str}
+            RETURN c.symbol AS sym, c.`{prop}` AS vec, c.sector AS sector, c.marketCapClass AS cap_class
+        """
+        with _driver.session(database="neo4j") as session:
+            results_candidate = session.run(candidate_query, **params_candidate)
+            for r_cand in results_candidate:
+                if r_cand["vec"]: # Ensure candidate vector exists
+                    candidate_vecs_data[r_cand["sym"]] = (
+                        np.asarray(r_cand["vec"], dtype=np.float32),
+                        r_cand["sector"],
+                        r_cand["cap_class"]
+                    )
+        
+        return target_vector, candidate_vecs_data
+
     except Exception as e:
-        st.error(f"Error loading vectors for {prop}: {e}")
+        st.error(f"Error loading vectors for {prop} (target: {target_sym}, year: {year}): {e}")
         return None, {}
 
 
