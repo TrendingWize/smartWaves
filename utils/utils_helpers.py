@@ -2,554 +2,278 @@ import streamlit as st
 from neo4j import GraphDatabase
 import pandas as pd
 from pandas.io.formats.style import Styler # pandas ≥1.0
-import numpy as np # Added
-from collections import defaultdict # Added
-from typing import Dict, List, Tuple # Added
-from typing import Any, Dict, List, Optional
+import numpy as np
+from collections import defaultdict
+from typing import Dict, List, Tuple, Any, Optional
 
-cumulative_scores = defaultdict(float)
 # ── Neo4j Config ───────────────────────────────────────────────────────
-# Store sensitive credentials securely. In a deployed Streamlit app,
-# use st.secrets (secrets.toml file). For local development, you might
-# use environment variables or a local config file (not committed).
 NEO4J_URI = st.secrets.get("NEO4J_URI", "neo4j+s://f9f444b7.databases.neo4j.io")
 NEO4J_USER = st.secrets.get("NEO4J_USER", "neo4j")
 NEO4J_PASSWORD = st.secrets.get("NEO4J_PASSWORD", "BhpVJhR0i8NxbDPU29OtvveNE8Wx3X2axPI7mS7zXW0")
 
-# utils.py
-@st.cache_data(ttl="1h", show_spinner="Calculating aggregated similarity scores...")
-def get_nearest_aggregate_similarities(_driver, 
-                                       target_sym: str, 
-                                       embedding_family: str, 
-                                       start_year: int = 2017, 
-                                       end_year: int = 2023, 
-                                       sectors=None,
-                                       weight_scheme=None,
-                                       normalize=True,
-                                       cap_classes=None,
-                                       k: int = 10) -> List[Tuple[str, float]]:
-    if not _driver:
-        return []
-
-    cumulative_scores = defaultdict(float)
-    years_processed_count = 0
-
-    for year in range(start_year, end_year + 1):
-        target_vector, candidate_vectors = load_vectors_for_similarity(
-            _driver, year, embedding_family, sectors=sectors, target_sym=target_sym
-        )
-        if target_vector is None or not candidate_vectors:
-            continue
-        yearly_similarity_scores = calculate_similarity_scores(target_vector, candidate_vectors)
-        for sym, score in yearly_similarity_scores.items():
-            cumulative_scores[sym] += score
-        years_processed_count += 1
-
-    if years_processed_count == 0:
-        st.warning(f"No data found for {target_sym} or its comparables in the selected year range and embedding family.")
-        return []
-
-    average_scores = {sym: score / years_processed_count for sym, score in cumulative_scores.items()}
-    best_k_similar = sorted(average_scores.items(), key=lambda item: item[1], reverse=True)[:k]
-    return best_k_similar
-
-    
-    cumulative_scores = defaultdict(float)  # <-- REQUIRED
-    years_processed_count = 0
-
-    for year in range(start_year, end_year + 1):
-        yearly_vectors = load_vectors_for_similarity(_driver, year, embedding_family, sectors=sectors)
-        target_vector = yearly_vectors.pop(target_sym, None)
-        if target_vector is None:
-            continue
-        if not yearly_vectors:
-            continue
-        yearly_similarity_scores = calculate_similarity_scores(target_vector, yearly_vectors)
-        for sym, score in yearly_similarity_scores.items():
-            cumulative_scores[sym] += score
-        years_processed_count += 1
-
-    if years_processed_count == 0:
-        st.warning(f"No data found for {target_sym} or its comparables in the selected year range and embedding family.")
-        return []
-
-    average_scores = {sym: score / years_processed_count for sym, score in cumulative_scores.items()}
-    best_k_similar = sorted(average_scores.items(), key=lambda item: item[1], reverse=True)[:k]
-    return best_k_similar
-                                           
-def fetch_sector_list(driver=None) -> List[str]:
-    """Fetch distinct sectors from database"""
-    if not driver:
-        driver = get_neo4j_driver()
-    
-    query = """
-    MATCH (s:Sector)
-    RETURN DISTINCT s.name AS sector
-    ORDER BY sector
-    """
-    try:
-        with driver.session() as session:
-            result = session.run(query)
-            return [record["sector"] for record in result]
-    except Exception as e:
-        print(f"Error fetching sectors: {str(e)}")
-        return []
-    finally:
-        if driver and hasattr(driver, 'close'):
-            driver.close()
-
-def fetch_company_preview(symbol: str, driver=None) -> Dict[str, Any]:
-    """Get basic company info"""
-    if not driver:
-        driver = get_neo4j_driver()
-    
-    query = """
-    MATCH (c:Company {symbol: $symbol})
-    RETURN 
-        c.companyName AS companyName,
-        c.sector AS sector,
-        c.industry AS industry,
-        c.description AS description
-    LIMIT 1
-    """
-    try:
-        with driver.session() as session:
-            result = session.run(query, symbol=symbol)
-            record = result.single()
-            return record.data() if record else {}
-    except Exception as e:
-        print(f"Error fetching company preview: {str(e)}")
-        return {}
-    finally:
-        if driver and hasattr(driver, 'close'):
-            driver.close()
-            
-def fetch_sector_list(driver=None) -> List[str]:
-    """Fetch distinct sectors from database"""
-    if not driver:
-        driver = get_neo4j_driver()
-    
-    query = """
-    MATCH (s:Sector)
-    RETURN DISTINCT s.name AS sector
-    ORDER BY sector
-    """
-    try:
-        with driver.session() as session:
-            result = session.run(query)
-            return [record["sector"] for record in result]
-    except Exception as e:
-        print(f"Error fetching sectors: {str(e)}")
-        return []
-    finally:
-        if driver and hasattr(driver, 'close'):
-            driver.close()
-
-def fetch_company_preview(symbol: str, driver=None) -> Dict[str, Any]:
-    """Get basic company info"""
-    if not driver:
-        driver = get_neo4j_driver()
-    
-    query = """
-    MATCH (c:Company {symbol: $symbol})
-    RETURN 
-        c.companyName AS companyName,
-        c.sector AS sector,
-        c.industry AS industry,
-        c.description AS description
-    LIMIT 1
-    """
-    try:
-        with driver.session() as session:
-            result = session.run(query, symbol=symbol)
-            record = result.single()
-            return record.data() if record else {}
-    except Exception as e:
-        print(f"Error fetching company preview: {str(e)}")
-        return {}
-    finally:
-        if driver and hasattr(driver, 'close'):
-            driver.close()
 # ── Neo4j Driver Cache ─────────────────────────────────────────────────
 @st.cache_resource
 def get_neo4j_driver():
-    """
-    Establishes and caches a connection to the Neo4j database.
-    Returns the Neo4j driver object or None if connection fails.
-    """
     try:
         driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
-        driver.verify_connectivity() # Check if the connection is valid
+        driver.verify_connectivity()
         return driver
     except Exception as e:
         st.error(f"Neo4j connection error: {e}")
         return None
 
-# ── Data Fetching ──────────────────────────────────────────────────────
-@st.cache_data(ttl="1h") # Cache data for 1 hour
-def fetch_income_statement_data(_driver, symbol: str, start_year: int = 2017) -> pd.DataFrame:
-    """
-    Fetches income statement data for a given company symbol and start year from Neo4j.
-    """
-    if not _driver:
-        return pd.DataFrame()
-
+# --- Market Cap Class Fetcher ---
+def fetch_market_cap_classes(driver) -> List[str]:
+    if not driver:
+        st.error("Neo4j driver not provided to fetch_market_cap_classes.")
+        return []
     query = """
-    MATCH (c:Company)-[:HAS_INCOME_STATEMENT]->(i:IncomeStatement)
-    WHERE c.symbol IN $symbols
-      AND ($year IS NULL OR i.calendarYear = $year)
-      AND ($sectors IS NULL OR c.sector IN $sectors)
-      AND i.fillingDate.year >= $start_yr
-    RETURN
-      i.fillingDate.year                     AS year,
-      // Revenue & Profitability
-      i.revenue                              AS revenue,
-      i.costOfRevenue                        AS costOfRevenue,
-      i.grossProfit                          AS grossProfit,
-      // Operating Expenses
-      i.researchAndDevelopmentExpenses       AS researchAndDevelopmentExpenses,
-      i.generalAndAdministrativeExpenses     AS generalAndAdministrativeExpenses,
-      i.sellingGeneralAndAdministrativeExpenses AS sellingGeneralAndAdministrativeExpenses,    
-      i.operatingExpenses                    AS operatingExpenses, 
-      i.operatingIncome                      AS operatingIncome, 
-      // Other Income / (Expense)
-      i.interestIncome                       AS interestIncome,
-      i.interestExpense                      AS interestExpense,
-      i.incomeBeforeTax                      AS incomeBeforeTax,
-      // Taxes & Net Income
-      i.incomeTaxExpense                     AS incomeTaxExpense,
-      i.netIncome                            AS netIncome
-    ORDER BY year ASC
+    MATCH (c:Company)
+    WHERE c.marketCapClass IS NOT NULL
+    RETURN DISTINCT c.marketCapClass AS cap_class
+    ORDER BY cap_class
     """
     try:
-        with _driver.session(database="neo4j") as session: # Specify database if not default
-            result = session.run(query, symbols=company_symbols, year=year, sectors=sectors)
-            data = [record.data() for record in result]
-        
-        if not data:
-            return pd.DataFrame()
-
-        df = pd.DataFrame(data)
-        
-        # Ensure all expected columns are present, fill with NA if not
-        expected_cols = [
-            'year', 'revenue', 'costOfRevenue', 'grossProfit',
-            'researchAndDevelopmentExpenses', 'generalAndAdministrativeExpenses',
-            'sellingGeneralAndAdministrativeExpenses', # Corrected name
-            'operatingExpenses', 'operatingIncome',
-            'interestIncome', 'interestExpense', 'incomeBeforeTax',
-            'incomeTaxExpense', 'netIncome'
-            # Derived metrics will be added after this block
-        ]
-        for col in expected_cols:
-            if col not in df.columns:
-                df[col] = pd.NA 
-
-        # Calculate derived metrics/ratios after ensuring base columns exist
-        # Handle potential division by zero or NA values gracefully
-        df['grossProfitMargin'] = df.apply(lambda row: (row['grossProfit'] / row['revenue']) * 100 \
-                                           if pd.notna(row['grossProfit']) and pd.notna(row['revenue']) and row['revenue'] != 0 \
-                                           else pd.NA, axis=1)
-        df['operatingIncomeMargin'] = df.apply(lambda row: (row['operatingIncome'] / row['revenue']) * 100 \
-                                               if pd.notna(row['operatingIncome']) and pd.notna(row['revenue']) and row['revenue'] != 0 \
-                                               else pd.NA, axis=1)
-        df['netIncomeMargin'] = df.apply(lambda row: (row['netIncome'] / row['revenue']) * 100 \
-                                         if pd.notna(row['netIncome']) and pd.notna(row['revenue']) and row['revenue'] != 0 \
-                                         else pd.NA, axis=1)
-        
-        if 'year' in df.columns : df['year'] = df['year'].astype(int) # Ensure year is integer
-        return df
+        with driver.session(database="neo4j") as session:
+            result = session.run(query)
+            return [record["cap_class"] for record in result]
     except Exception as e:
-        st.error(f"Error fetching or processing income data for {symbol}: {e}")
-        return pd.DataFrame()
+        st.error(f"Error fetching market cap classes: {str(e)}")
+        return []
+    # No explicit driver.close() here as it's managed by @st.cache_resource or passed externally
 
+# --- Vector Loader with Filtering ---
+@st.cache_data(ttl="1h")
+def load_vectors_for_similarity(
+    driver,
+    year: int,
+    family: str = "cf_vec_",
+    sectors: List[str] = None,
+    cap_classes: List[str] = None,
+    target_sym: str = None
+) -> Tuple[Optional[np.ndarray], Dict[str, Tuple[np.ndarray, str, str]]]:
+    if not driver:
+        st.error("Neo4j driver not provided to load_vectors_for_similarity.")
+        return None, {}
 
-# ── Formatting and Styling Helpers ─────────────────────────────────────
-def format_value(value, is_percent=False, currency_symbol="$", is_ratio=False, decimals=2):
-    """
-    Formats a numerical value into a string with appropriate suffixes (B, M, K),
-    currency symbols, or percentage signs.
-    Handles NA values by returning "N/A".
-    """
-    if pd.isna(value) or value is None:
-        return "N/A"
-    
-    if is_percent: # For percentages
-        return f"{value:.{decimals}f}%"
-    
-    if is_ratio: # For raw ratios (e.g., Current Ratio)
-        return f"{value:.{decimals}f}" # Display with specified decimal places
-        
-    # For numerical monetary values
-    if isinstance(value, (int, float)):
-        num_str = ""
-        abs_value = abs(value) # Use absolute value for threshold checks
-        
-        # Determine suffix based on magnitude
-        if abs_value >= 1_000_000_000_000: num_str = f"{value / 1_000_000_000_000:.{decimals}f}T" # Trillions
-        elif abs_value >= 1_000_000_000: num_str = f"{value / 1_000_000_000:.{decimals}f}B"    # Billions
-        elif abs_value >= 1_000_000: num_str = f"{value / 1_000_000:.{decimals}f}M"       # Millions
-        elif abs_value >= 1_000: num_str = f"{value / 1_000:.{decimals}f}K"          # Thousands
-        else: # Smaller numbers or those to show fully (e.g. stock price)
-            num_str = f"{value:,.{decimals}f}" # Default to specified decimal places with comma for thousands
-        
-        # Prepend currency symbol if provided and value is not just a suffix
-        return f"{currency_symbol}{num_str}" if currency_symbol and num_str else num_str
-        
-    return str(value) # Fallback for non-numeric, non-NA types (should be rare for metrics)
-
-def calculate_delta(current_value, previous_value):
-    """
-    Calculates the difference between current and previous values.
-    Returns None if data is insufficient or previous value is zero (to avoid division by zero issues downstream).
-    """
-    if pd.isna(current_value) or pd.isna(previous_value) or previous_value == 0:
-        return None 
-    return current_value - previous_value
-
-def _arrow(prev_val, curr_val, is_percent=False): # is_percent can influence how "better" is judged for some metrics
-    """
-    Generates an HTML span with an arrow indicating change direction.
-    Green up arrow for increase, red down arrow for decrease, neutral for no change or NA.
-    """
-    if pd.isna(prev_val) or pd.isna(curr_val):
-        return " →" # Neutral arrow for missing data
-    
-    # Simple comparison: higher is up, lower is down.
-    # For specific metrics (e.g., expenses), a decrease might be positive.
-    # This function provides a generic visual cue; context is handled by interpretation.
-    if curr_val > prev_val:
-        return " <span style='color:green; font-weight:bold;'>↑</span>"
-    if curr_val < prev_val:
-        return " <span style='color:red; font-weight:bold;'>↓</span>"
-    return " →" # Neutral for no change
-
-
-def R_display_metric_card(st_container, label: str, latest_data: pd.Series, prev_data: pd.Series, 
-                         is_percent: bool = False, is_ratio: bool = False, 
-                         help_text: str = None, currency_symbol: str = "$"):
-    """
-    Displays a styled metric card using st.metric, including value and delta.
-    st_container: The Streamlit container (e.g., st or a column object) to place the metric in.
-    label: The raw metric key (e.g., 'grossProfitMargin').
-    latest_data: Pandas Series containing the latest period's data.
-    prev_data: Pandas Series containing the previous period's data.
-    is_percent: True if the value is a percentage.
-    is_ratio: True if the value is a raw ratio (no currency, specific decimal formatting).
-    help_text: Custom help text for the metric card.
-    currency_symbol: Currency symbol to use for monetary values.
-    """
-    current_val = latest_data.get(label)
-    prev_val = prev_data.get(label)
-    
-    delta_val = calculate_delta(current_val, prev_val)
-    
-    delta_display = None # String for st.metric's delta parameter
-    if delta_val is not None:
-        delta_prefix = ""
-        # Monetary values
-        if not is_percent and not is_ratio:
-            if delta_val > 0: delta_prefix = "+"
-            # Format the absolute delta value with B/M/K suffixes
-            abs_delta_for_format = abs(delta_val)
-            if abs_delta_for_format >= 1_000_000_000: formatted_abs_delta = f"{abs_delta_for_format / 1_000_000_000:.2f}B"
-            elif abs_delta_for_format >= 1_000_000: formatted_abs_delta = f"{abs_delta_for_format / 1_000_000:.2f}M"
-            elif abs_delta_for_format >= 1_000: formatted_abs_delta = f"{abs_delta_for_format / 1_000:.2f}K"
-            else: formatted_abs_delta = f"{abs_delta_for_format:,.0f}" # Default to integer for smaller monetary deltas
-            delta_display = f"{delta_prefix}{formatted_abs_delta}"
-        # Percentage point changes
-        elif is_percent: 
-            delta_display = f"{delta_val:+.2f}pp" # "pp" for percentage points
-        # Raw ratio changes
-        elif is_ratio: 
-            delta_display = f"{delta_val:+.2f}" # Show with sign and 2 decimal places
-
-    # Construct help text string for the metric card
-    current_formatted_val = format_value(current_val, is_percent, currency_symbol if not (is_percent or is_ratio) else "", is_ratio=is_ratio)
-    prev_formatted_val = format_value(prev_val, is_percent, currency_symbol if not (is_percent or is_ratio) else "", is_ratio=is_ratio)
-
-    help_str_parts = []
-    if pd.notna(current_val): help_str_parts.append(f"Latest: {current_formatted_val}")
-    else: help_str_parts.append("Latest: N/A")
-    if pd.notna(prev_val): help_str_parts.append(f"Previous: {prev_formatted_val}")
-    
-    final_help_text_for_metric = " | ".join(help_str_parts)
-    if help_text: # Prepend custom help text if provided
-        final_help_text_for_metric = f"{help_text}\n{final_help_text_for_metric}"
-
-    # Create a more readable display label for the metric card
-    # Common abbreviations and capitalizations
-    display_label = label.replace("Margin", " Mgn").replace("Expenses", " Exp.") \
-                         .replace("Equivalents", "Equiv.").replace("Receivables","Recv.") \
-                         .replace("Payables","Pay.").replace("Liabilities","Liab.") \
-                         .replace("Assets","Ast.").replace("Activities", "Act.") \
-                         .replace("ProvidedByOperating", "Op.").replace("ProvidedByInvesting", "Inv.").replace("ProvidedByFinancing", "Fin.") \
-                         .replace("ProvidedBy", "/").replace("UsedFor","Used For") \
-                         .replace("Expenditure","Exp.").replace("Income", "Inc.") \
-                         .replace("Statement","Stmt.").replace("Interest","Int.") \
-                         .replace("Development","Dev.").replace("Administrative","Admin.") \
-                         .replace("General","Gen.").replace("ShortTerm","ST") \
-                         .replace("LongTerm","LT").replace("Total","Tot.") \
-                         .replace("StockholdersEquity", "Equity").replace("PropertyPlantEquipmentNet", "PP&E (Net)")
-    # Capitalize words, handle "And" -> "&"
-    display_label = ' '.join(word.capitalize() if not word.isupper() else word for word in display_label.replace("And", "&").split())
-
-
-    st_container.metric(
-        label=display_label,
-        value=current_formatted_val if pd.notna(current_val) else "N/A",
-        delta=delta_display,
-        help=final_help_text_for_metric
-    )
-
-def build_styled_dataframe(df_long: pd.DataFrame, metrics_to_display: list) -> Styler:
-    """
-    Builds a Pandas Styler object for a table, with values formatted and arrows indicating change.
-    This function is kept as a general utility but might not be directly used if manual HTML tables
-    offer more control for specific categorized layouts.
-    """
-    if df_long.empty or not metrics_to_display:
-        return pd.DataFrame().style # Return empty Styler if no data or metrics
-
-    if 'year' not in df_long.columns:
-        # This function expects df_long to have a 'year' column for pivoting.
-        # If 'year' is already an index, the logic would need adjustment.
-        st.warning("Dataframe for 'build_styled_dataframe' is expected to have a 'year' column.")
-        return pd.DataFrame(index=metrics_to_display).style # Return empty styler with metric names as index
-        
-    # Filter metrics_to_display to include only those present in df_long columns
-    valid_metrics = [m for m in metrics_to_display if m in df_long.columns]
-    if not valid_metrics:
-        st.warning(f"None of the metrics for the styled table are present in the data: {metrics_to_display}")
-        return pd.DataFrame(index=metrics_to_display).style # Styler with metric names as index
-            
-    df_for_pivot = df_long[['year'] + valid_metrics]
-    try:
-        # Pivot the data: years as columns, metrics as rows
-        df_display_transposed = df_for_pivot.set_index("year")[valid_metrics].transpose()
-    except KeyError as e: 
-        st.warning(f"Pivoting error in 'build_styled_dataframe': {e}. Check 'year' column and metric names.")
-        return pd.DataFrame(index=metrics_to_display).style
-
-    # Create a new DataFrame to hold HTML-formatted strings (value + arrow)
-    out_df_with_html = pd.DataFrame(index=df_display_transposed.index, 
-                                    columns=df_display_transposed.columns, 
-                                    dtype=object) # Use object dtype for mixed content
-
-    for r_idx, metric_name in enumerate(out_df_with_html.index):
-        # Heuristic to determine if a metric is a percentage or ratio for formatting
-        is_percent_or_ratio_metric = "Margin" in metric_name or "Ratio" in metric_name 
-
-        for c_idx, year_val in enumerate(out_df_with_html.columns):
-            current_val = df_display_transposed.loc[metric_name, year_val]
-            
-            if pd.isna(current_val):
-                out_df_with_html.iat[r_idx, c_idx] = "N/A" # Display N/A for missing values
-                continue
-
-            # Format the current value
-            formatted_current_val = format_value(current_val, 
-                                                 is_percent=is_percent_or_ratio_metric and "Margin" in metric_name, # Only % for margins
-                                                 currency_symbol="$" if not is_percent_or_ratio_metric else "", # No currency for %/ratios
-                                                 is_ratio=is_percent_or_ratio_metric and "Ratio" in metric_name, # Explicitly for ratios
-                                                 decimals=2) 
-            
-            arrow_symbol_html = "" # Default to no arrow (e.g., for the first year)
-            if c_idx > 0: # Calculate arrow if not the first year column
-                prev_year_val = out_df_with_html.columns[c_idx-1]
-                prev_val = df_display_transposed.loc[metric_name, prev_year_val]
-                arrow_symbol_html = _arrow(prev_val, current_val, is_percent=is_percent_or_ratio_metric) # Arrow logic
-            
-            # Combine formatted value and HTML arrow into a single string for the cell
-            out_df_with_html.iat[r_idx, c_idx] = f"{formatted_current_val}{arrow_symbol_html}"
-
-    styler = out_df_with_html.style
-    # Use a formatter that just returns the value as is (identity function)
-    # This is crucial because the cells already contain pre-rendered HTML.
-    styler = styler.format(lambda x: x) 
-
-    # Apply table-level and cell-level properties using Pandas Styler
-    styler = styler.set_properties(**{
-        "white-space": "nowrap",   # Prevent text wrapping in cells
-        "text-align": "right",     # Align content to the right (common for numerical data)
-        "padding": "6px 8px",      # Add some padding within cells
-        "border": "1px solid #eee" # Light border for cells
-    })
-
-    styler = styler.set_table_styles([
-        # Style for column headers (years)
-        {'selector': 'th.col_heading', 'props': [('background-color', '#f7f7f7'), ('font-weight', 'bold'), ('text-align', 'center'), ('padding', '6px 8px')]},
-        # Style for row headers (metric names)
-        {'selector': 'th.row_heading', 'props': [('background-color', '#f7f7f7'), ('font-weight', 'bold'), ('text-align', 'left'), ('padding-left', '10px')]},
-        # General style for data cells (td)
-        {'selector': 'td', 'props': [('text-align', 'right'), ('padding', '5px 8px')]}, # Slightly less padding for data cells
-        # Hover effect for table rows
-        {'selector': 'tr:hover', 'props': [('background-color', '#f1f1f1')]} 
-    ])
-    # Note: To use this Styler object with st.markdown, you'd convert it to HTML:
-    # html_table = styler.to_html(escape=False)
-    # st.markdown(html_table, unsafe_allow_html=True)
-    # Or, if using st.dataframe, Streamlit handles the Styler object directly:
-    # st.dataframe(styler) - but st.dataframe doesn't render HTML content within cells by default.
-            
-    return styler
-    
-@st.cache_data(ttl="1h", show_spinner="Loading vector data for year...")
-def load_vectors_for_similarity(_driver, year: int, family: str = "cf_vec_", sectors: List[str]=None, cap_classes: List[str]=None, target_sym: str=None):
     prop = f"{family}{year}"
-    params = {}
-    filter_clauses = ["c.{prop} IS NOT NULL", "c.ipoDate IS NOT NULL"]
+    where_clauses = [f"c.`{prop}` IS NOT NULL", "c.ipoDate IS NOT NULL"] # Ensure c.ipoDate is indexed if used often
+    params = {"prop_name": prop} # Parameterize prop_name if possible, Cypher might not allow dynamic prop keys directly in WHERE like this easily
+
     if sectors:
-        filter_clauses.append("c.sector IN $sectors")
+        where_clauses.append("c.sector IN $sectors")
         params["sectors"] = sectors
     if cap_classes:
-        filter_clauses.append("c.marketCapClass IN $cap_classes")
+        where_clauses.append("c.marketCapClass IN $cap_classes")
         params["cap_classes"] = cap_classes
+
+    where_str = " AND ".join(where_clauses)
+    # Note: Using f-string for prop in RETURN is generally okay if `family` and `year` are controlled.
     query = f"""
-    MATCH (c:Company)
-    WHERE {' AND '.join(filter_clauses)}
-    RETURN c.symbol AS sym, c.{prop} AS vec, c.sector AS sector
+        MATCH (c:Company)
+        WHERE {where_str}
+        RETURN c.symbol AS sym, c.`{prop}` AS vec, c.sector AS sector, c.marketCapClass AS cap_class
     """
     try:
-        with _driver.session(database="neo4j") as session:
+        with driver.session(database="neo4j") as session:
             results = session.run(query, **params)
-            all_vecs = {r["sym"]: (np.asarray(r["vec"], dtype=np.float32), r["sector"]) for r in results}
-            target_vector = all_vecs.get(target_sym, (None, None))[0]
-            # Filter by sector/cap for candidates, but not for the anchor
-            candidate_vecs = {sym: vec for sym, (vec, sector) in all_vecs.items() if sym != target_sym}
-            return target_vector, candidate_vecs
+            all_vecs_data = {
+                r["sym"]: (np.asarray(r["vec"], dtype=np.float32), r["sector"], r["cap_class"])
+                for r in results if r["vec"] is not None # Ensure vector exists
+            }
+            
+            target_data = all_vecs_data.get(target_sym)
+            target_vector = target_data[0] if target_data else None
+            
+            # Candidate vectors should exclude the target symbol
+            candidate_vecs_data = {
+                sym: data for sym, data in all_vecs_data.items() if sym != target_sym
+            }
+            return target_vector, candidate_vecs_data
     except Exception as e:
         st.error(f"Error loading vectors for {prop}: {e}")
         return None, {}
 
-
-def calculate_similarity_scores(target_vector: np.ndarray, vectors: Dict[str, np.ndarray]) -> Dict[str, float]:
-    """Calculates cosine similarity between a target vector and a dictionary of other vectors."""
-    if target_vector is None or not vectors:
+# --- Cosine Similarity ---
+def calculate_similarity_scores(target_vector: np.ndarray,
+                                candidate_vectors_data: Dict[str, Tuple[np.ndarray, str, str]]) -> Dict[str, float]:
+    if target_vector is None or not candidate_vectors_data:
         return {}
     
-    other_symbols = list(vectors.keys())
-    matrix_of_vectors = np.vstack(list(vectors.values()))
-    
-    # Normalize matrix and target vector
-    matrix_of_vectors /= (np.linalg.norm(matrix_of_vectors, axis=1, keepdims=True) + 1e-12)
-    target_vector /= (np.linalg.norm(target_vector) + 1e-12)
-    
-    similarities = matrix_of_vectors @ target_vector
-    return dict(zip(other_symbols, similarities.astype(float)))
+    candidate_symbols = list(candidate_vectors_data.keys())
+    # Extract just the vectors for calculation
+    matrix_of_vectors = np.vstack([data[0] for data in candidate_vectors_data.values()])
 
+    # Normalize matrix and target vector
+    norm_matrix = np.linalg.norm(matrix_of_vectors, axis=1, keepdims=True)
+    norm_target = np.linalg.norm(target_vector)
+
+    if norm_target < 1e-12: # Avoid division by zero for zero target vector
+        return {sym: 0.0 for sym in candidate_symbols}
+
+    # Avoid division by zero for candidate vectors
+    # Create a mask for rows with zero norm
+    zero_norm_mask = (norm_matrix < 1e-12).flatten()
+
+    # Normalize non-zero norm vectors
+    # Initialize similarities array
+    similarities = np.zeros(len(candidate_symbols), dtype=float)
+    
+    # Normalize valid vectors
+    valid_matrix_indices = ~zero_norm_mask
+    if np.any(valid_matrix_indices):
+        matrix_of_vectors[valid_matrix_indices] /= norm_matrix[valid_matrix_indices]
+    
+    target_vector_normalized = target_vector / norm_target
+    
+    # Calculate dot product for valid, normalized vectors
+    if np.any(valid_matrix_indices):
+       similarities[valid_matrix_indices] = matrix_of_vectors[valid_matrix_indices] @ target_vector_normalized
+
+    return dict(zip(candidate_symbols, similarities.astype(float)))
+
+
+# --- Main Similarity Function ---
+@st.cache_data(ttl="1h", show_spinner="Calculating aggregated similarity scores...")
+def get_nearest_aggregate_similarities(driver,
+                                       target_sym: str,
+                                       embedding_family: str,
+                                       start_year: int = 2017,
+                                       end_year: int = 2023,
+                                       sectors: Optional[List[str]] = None,
+                                       cap_classes: Optional[List[str]] = None,
+                                       weight_scheme: str = "mean", # 'mean', 'latest', 'decay'
+                                       decay_lambda: float = 0.7, # Only for 'decay'
+                                       normalize: bool = True, # Note: Normalization happens in calculate_similarity
+                                       k: int = 10) -> List[Tuple[str, float]]:
+    if not driver:
+        st.error("Neo4j driver not provided to get_nearest_aggregate_similarities.")
+        return []
+
+    all_yearly_scores = defaultdict(list)
+    processed_years_for_sym = defaultdict(list)
+
+    for year in range(start_year, end_year + 1):
+        target_vector, yearly_candidate_data = load_vectors_for_similarity(
+            driver, year, embedding_family, sectors=sectors, cap_classes=cap_classes, target_sym=target_sym
+        )
+        if target_vector is None:
+            st.info(f"No vector data for target {target_sym} in {year} with current filters.")
+            continue
+        if not yearly_candidate_data:
+            st.info(f"No candidate vectors found for comparison in {year} with current filters.")
+            continue
+            
+        yearly_similarity_scores = calculate_similarity_scores(target_vector, yearly_candidate_data)
+        
+        for sym, score in yearly_similarity_scores.items():
+            all_yearly_scores[sym].append({'year': year, 'score': score})
+            processed_years_for_sym[sym].append(year)
+
+    if not all_yearly_scores:
+        st.warning(f"No similarity scores computed for {target_sym} or its comparables in the selected year range ({start_year}-{end_year}), embedding family ({embedding_family}), and filters.")
+        return []
+
+    aggregated_scores = defaultdict(float)
+    
+    if weight_scheme == "latest":
+        for sym, scores_data in all_yearly_scores.items():
+            if not scores_data: continue
+            latest_year_data = max(scores_data, key=lambda x: x['year'], default=None)
+            if latest_year_data and latest_year_data['year'] == end_year : # Ensure it's actually the intended end_year
+                 aggregated_scores[sym] = latest_year_data['score']
+            # else: consider if we want the latest available if not end_year
+    
+    elif weight_scheme == "decay":
+        # Recency-weighted mean (λ-decay)
+        total_weights = defaultdict(float)
+        for sym, scores_data in all_yearly_scores.items():
+            if not scores_data: continue
+            current_sum_score = 0
+            current_sum_weight = 0
+            for data_point in scores_data:
+                year_val = data_point['year']
+                score_val = data_point['score']
+                weight = decay_lambda ** (end_year - year_val) # More recent years get higher weight
+                current_sum_score += score_val * weight
+                current_sum_weight += weight
+            if current_sum_weight > 0:
+                aggregated_scores[sym] = current_sum_score / current_sum_weight
+                
+    else: # Default is "mean"
+        for sym, scores_data in all_yearly_scores.items():
+            if not scores_data: continue
+            sum_scores = sum(d['score'] for d in scores_data)
+            count_scores = len(scores_data)
+            if count_scores > 0:
+                aggregated_scores[sym] = sum_scores / count_scores
+                
+    if not aggregated_scores:
+         st.warning(f"No companies found after applying weighting scheme '{weight_scheme}'.")
+         return []
+
+    best_k_similar = sorted(aggregated_scores.items(), key=lambda item: item[1], reverse=True)[:k]
+    return best_k_similar
+
+# --- Other Neo4j Data Fetchers ---
+def fetch_sector_list(driver) -> List[str]:
+    if not driver:
+        st.error("Neo4j driver not provided to fetch_sector_list.")
+        return []
+    query = """
+    MATCH (c:Company) WHERE c.sector IS NOT NULL
+    RETURN DISTINCT c.sector AS sector
+    ORDER BY sector
+    """ # Changed to directly query Company.sector as schema shows Sector node but not relation
+    try:
+        with driver.session(database="neo4j") as session:
+            result = session.run(query)
+            return [record["sector"] for record in result]
+    except Exception as e:
+        st.error(f"Error fetching sectors: {str(e)}")
+        return []
+
+def fetch_company_preview(driver, symbol: str) -> Dict[str, Any]:
+    if not driver:
+        st.error("Neo4j driver not provided to fetch_company_preview.")
+        return {}
+    query = """
+    MATCH (c:Company {symbol: $symbol})
+    RETURN
+        c.companyName AS companyName,
+        c.sector AS sector,
+        c.industry AS industry,
+        c.description AS description
+    LIMIT 1
+    """
+    try:
+        with driver.session(database="neo4j") as session:
+            result = session.run(query, symbol=symbol)
+            record = result.single()
+            return record.data() if record else {}
+    except Exception as e:
+        st.error(f"Error fetching company preview for {symbol}: {str(e)}")
+        return {}
 
 @st.cache_data(ttl="1h", show_spinner="Fetching financial details for similar companies...")
 def fetch_financial_details_for_companies(
-    _driver, 
-    company_symbols: List[str], 
-    year: int = None,
-    sectors: List[str] = None
+    driver,
+    company_symbols: List[str],
+    year: Optional[int] = None,
+    # sectors: Optional[List[str]] = None # Decided to remove sector filter here for now
+                                         # to show details for all found similar peers.
 ) -> Dict[str, Dict]:
+    if not driver:
+        st.error("Neo4j driver not provided to fetch_financial_details_for_companies.")
+        return {}
+    if not company_symbols:
+        return {}
+
+    # Query adjusted to fetch latest statements if year is None, or specific year if provided.
+    # Removed sector filter from this specific detail fetching step.
     query_option_b_no_apoc = """
     UNWIND $symbols AS sym_param
     MATCH (c:Company {symbol: sym_param})
-    WHERE $sectors IS NULL OR c.sector IN $sectors
 
     OPTIONAL MATCH (c)-[:HAS_INCOME_STATEMENT]->(is_node:IncomeStatement)
     WHERE is_node.fillingDate IS NOT NULL AND ($year IS NULL OR is_node.calendarYear = $year)
@@ -570,6 +294,7 @@ def fetch_financial_details_for_companies(
            c.companyName AS companyName,
            c.sector AS sector,
            c.industry AS industry,
+           c.marketCap AS marketCap, // Added marketCap for more context
            latest_is.revenue AS revenue,
            latest_is.netIncome AS netIncome,
            latest_is.operatingIncome AS operatingIncome,
@@ -578,6 +303,8 @@ def fetch_financial_details_for_companies(
            latest_bs.totalLiabilities AS totalLiabilities,
            latest_bs.totalStockholdersEquity AS totalStockholdersEquity,
            latest_bs.cashAndCashEquivalents AS cashAndCashEquivalents,
+           latest_bs.totalCurrentAssets AS totalCurrentAssets, // For Current Ratio
+           latest_bs.totalCurrentLiabilities AS totalCurrentLiabilities, // For Current Ratio
            latest_cf.operatingCashFlow AS operatingCashFlow,
            latest_cf.freeCashFlow AS freeCashFlow,
            latest_cf.netChangeInCash AS netChangeInCash,
@@ -585,8 +312,8 @@ def fetch_financial_details_for_companies(
     """
     details = {}
     try:
-        with _driver.session(database="neo4j") as session:
-            results = session.run(query_option_b_no_apoc, symbols=company_symbols, sectors=sectors, year=year)
+        with driver.session(database="neo4j") as session:
+            results = session.run(query_option_b_no_apoc, symbols=company_symbols, year=year)
             for record in results:
                 details[record["symbol"]] = record.data()
         return details
@@ -594,3 +321,86 @@ def fetch_financial_details_for_companies(
         st.error(f"Error fetching financial details: {e}")
         return {}
 
+# ── Data Fetching for specific statements (example) ───────────────────
+@st.cache_data(ttl="1h")
+def fetch_income_statement_data(driver, symbol: str, start_yr: int = 2017, end_yr: Optional[int] = None) -> pd.DataFrame:
+    if not driver:
+        st.error("Neo4j driver not provided to fetch_income_statement_data.")
+        return pd.DataFrame()
+
+    # Build year condition
+    year_condition = "i.calendarYear >= $start_yr"
+    params = {"symbol": symbol, "start_yr": start_yr}
+    if end_yr:
+        year_condition += " AND i.calendarYear <= $end_yr"
+        params["end_yr"] = end_yr
+        
+    query = f"""
+    MATCH (c:Company {{symbol: $symbol}})-[:HAS_INCOME_STATEMENT]->(i:IncomeStatement)
+    WHERE {year_condition}
+    RETURN
+      i.calendarYear AS year, // Changed from i.fillingDate.year for consistency
+      i.revenue AS revenue,
+      i.costOfRevenue AS costOfRevenue,
+      i.grossProfit AS grossProfit,
+      i.researchAndDevelopmentExpenses AS researchAndDevelopmentExpenses,
+      i.generalAndAdministrativeExpenses AS generalAndAdministrativeExpenses,
+      i.sellingGeneralAndAdministrativeExpenses AS sellingGeneralAndAdministrativeExpenses,
+      i.operatingExpenses AS operatingExpenses,
+      i.operatingIncome AS operatingIncome,
+      i.interestIncome AS interestIncome,
+      i.interestExpense AS interestExpense,
+      i.incomeBeforeTax AS incomeBeforeTax,
+      i.incomeTaxExpense AS incomeTaxExpense,
+      i.netIncome AS netIncome
+    ORDER BY year ASC
+    """
+    try:
+        with driver.session(database="neo4j") as session:
+            result = session.run(query, **params)
+            data = [record.data() for record in result]
+
+        if not data:
+            return pd.DataFrame()
+
+        df = pd.DataFrame(data)
+        expected_cols = [
+            'year', 'revenue', 'costOfRevenue', 'grossProfit',
+            'researchAndDevelopmentExpenses', 'generalAndAdministrativeExpenses',
+            'sellingGeneralAndAdministrativeExpenses', 'operatingExpenses', 'operatingIncome',
+            'interestIncome', 'interestExpense', 'incomeBeforeTax',
+            'incomeTaxExpense', 'netIncome'
+        ]
+        for col in expected_cols:
+            if col not in df.columns:
+                df[col] = pd.NA
+
+        df['grossProfitMargin'] = df.apply(lambda row: (row['grossProfit'] / row['revenue']) * 100 if pd.notna(row['grossProfit']) and pd.notna(row['revenue']) and row['revenue'] != 0 else pd.NA, axis=1)
+        df['operatingIncomeMargin'] = df.apply(lambda row: (row['operatingIncome'] / row['revenue']) * 100 if pd.notna(row['operatingIncome']) and pd.notna(row['revenue']) and row['revenue'] != 0 else pd.NA, axis=1)
+        df['netIncomeMargin'] = df.apply(lambda row: (row['netIncome'] / row['revenue']) * 100 if pd.notna(row['netIncome']) and pd.notna(row['revenue']) and row['revenue'] != 0 else pd.NA, axis=1)
+
+        if 'year' in df.columns: df['year'] = df['year'].astype(int)
+        return df
+    except Exception as e:
+        st.error(f"Error fetching or processing income data for {symbol}: {e}")
+        return pd.DataFrame()
+
+
+# ── Formatting and Styling Helpers ─────────────────────────────────────
+def format_value(value, is_percent=False, currency_symbol="$", is_ratio=False, decimals=2):
+    if pd.isna(value) or value is None:
+        return "N/A"
+    if is_percent:
+        return f"{value:.{decimals}f}%"
+    if is_ratio:
+        return f"{value:.{decimals}f}"
+    if isinstance(value, (int, float)):
+        num_str = ""
+        abs_value = abs(value)
+        if abs_value >= 1_000_000_000_000: num_str = f"{value / 1_000_000_000_000:.{decimals}f}T"
+        elif abs_value >= 1_000_000_000: num_str = f"{value / 1_000_000_000:.{decimals}f}B"
+        elif abs_value >= 1_000_000: num_str = f"{value / 1_000_000:.{decimals}f}M"
+        elif abs_value >= 1_000: num_str = f"{value / 1_000:.{decimals}f}K"
+        else: num_str = f"{value:,.{decimals}f}"
+        return f"{currency_symbol}{num_str}" if currency_symbol and num_str else num_str
+    return str(value)
