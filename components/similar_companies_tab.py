@@ -1,24 +1,22 @@
 # components/similar_companies_tab.py
+
 import streamlit as st
 import numpy as np
 import inspect
 from datetime import datetime
 from typing import Dict, List, Tuple, Any
 
-# Corrected import path
 from utils import (
     get_neo4j_driver,
-    get_nearest_aggregate_similarities,
     fetch_financial_details_for_companies,
-    format_value,
     fetch_sector_list,
-    fetch_company_preview
+    fetch_company_preview,
+    format_value
 )
-
 
 DEFAULT_DECAY = 0.7  # λ for recency-weighted mean
 
-# After fetching the sector list, fetch unique marketCapClass values:
+# --- Market Cap Class Fetcher ---
 def fetch_market_cap_classes(driver=None):
     if not driver:
         driver = get_neo4j_driver()
@@ -39,35 +37,109 @@ def fetch_market_cap_classes(driver=None):
         if driver and hasattr(driver, 'close'):
             driver.close()
 
+# --- Vector Loader with Filtering ---
+@st.cache_data(ttl="1h")
+def load_vectors_for_similarity(_driver, year: int, family: str = "cf_vec_", sectors: List[str]=None, cap_classes: List[str]=None, target_sym: str=None):
+    prop = f"{family}{year}"
+    query = f"""
+    MATCH (c:Company)
+    WHERE c.{prop} IS NOT NULL AND c.ipoDate IS NOT NULL
+    """
+    if sectors:
+        query += " AND c.sector IN $sectors"
+    if cap_classes:
+        query += " AND c.marketCapClass IN $cap_classes"
+    query += "\nRETURN c.symbol AS sym, c.{prop} AS vec, c.sector AS sector, c.marketCapClass AS cap_class"
+    params = {}
+    if sectors:
+        params["sectors"] = sectors
+    if cap_classes:
+        params["cap_classes"] = cap_classes
+    try:
+        with _driver.session(database="neo4j") as session:
+            results = session.run(query, **params)
+            all_vecs = {r["sym"]: (np.asarray(r["vec"], dtype=np.float32), r["sector"], r["cap_class"]) for r in results}
+            target_vector = all_vecs.get(target_sym, (None, None, None))[0]
+            candidate_vecs = {sym: vec for sym, (vec, _, _) in all_vecs.items() if sym != target_sym}
+            return target_vector, candidate_vecs
+    except Exception as e:
+        st.error(f"Error loading vectors for {prop}: {e}")
+        return None, {}
 
+# --- Cosine Similarity ---
+def calculate_similarity_scores(target_vector: np.ndarray, vectors: Dict[str, np.ndarray]) -> Dict[str, float]:
+    if target_vector is None or not vectors:
+        return {}
+    matrix_of_vectors = np.vstack(list(vectors.values()))
+    matrix_of_vectors /= (np.linalg.norm(matrix_of_vectors, axis=1, keepdims=True) + 1e-12)
+    target_vector /= (np.linalg.norm(target_vector) + 1e-12)
+    similarities = matrix_of_vectors @ target_vector
+    return dict(zip(vectors.keys(), similarities.astype(float)))
 
+# --- Main Similarity Function ---
+@st.cache_data(ttl="1h", show_spinner="Calculating aggregated similarity scores...")
+def get_nearest_aggregate_similarities(_driver, 
+                                       target_sym: str, 
+                                       embedding_family: str, 
+                                       start_year: int = 2017, 
+                                       end_year: int = 2023, 
+                                       sectors=None,
+                                       cap_classes=None,
+                                       weight_scheme=None,
+                                       normalize=True,
+                                       k: int = 10) -> List[Tuple[str, float]]:
+    if not _driver:
+        return []
+    from collections import defaultdict
+    cumulative_scores = defaultdict(float)
+    years_processed_count = 0
+
+    for year in range(start_year, end_year + 1):
+        target_vector, yearly_vectors = load_vectors_for_similarity(
+            _driver, year, embedding_family, sectors=sectors, cap_classes=cap_classes, target_sym=target_sym
+        )
+        if target_vector is None or not yearly_vectors:
+            continue
+        yearly_similarity_scores = calculate_similarity_scores(target_vector, yearly_vectors)
+        for sym, score in yearly_similarity_scores.items():
+            cumulative_scores[sym] += score
+        years_processed_count += 1
+
+    if years_processed_count == 0:
+        st.warning(f"No data found for {target_sym} or its comparables in the selected year range and embedding family.")
+        return []
+
+    average_scores = {sym: score / years_processed_count for sym, score in cumulative_scores.items()}
+    best_k_similar = sorted(average_scores.items(), key=lambda item: item[1], reverse=True)[:k]
+    return best_k_similar
+
+# --- UI Function ---
 def similar_companies_tab_content() -> None:
-    """Render enhanced 'Find Similar Companies' tab"""
     st.title("🔍 Fundamental Similarity Analysis")
     st.markdown("""
     Discover fundamentally similar companies using financial statement embeddings.
-    *Features:* Custom time ranges, sector filters, metric selection & visual comparisons.
+    *Features:* Custom time ranges, sector and market cap class filters, metric selection & visual comparisons.
     """)
     
-    # Initialize driver early for sector list
+    # Pre-fetch sectors & market cap classes
     neo_driver = get_neo4j_driver()
-    sectors = []
+    sectors, cap_classes = [], []
     try:
         sectors = fetch_sector_list(neo_driver)
+        cap_classes = fetch_market_cap_classes(neo_driver)
     except Exception as e:
-        st.error(f"Couldn't fetch sector list: {str(e)}")
+        st.error(f"Couldn't fetch sector/market cap: {str(e)}")
         sectors = ["Technology", "Healthcare", "Financial"]
+        cap_classes = ["Large Cap", "Mid Cap", "Small Cap"]
     finally:
         if hasattr(neo_driver, "close"):
             neo_driver.close()
 
-    # ---------- User Inputs Section ----------
     with st.expander("🔧 Search Parameters", expanded=True):
         col_sym, col_family = st.columns([2, 2])
-        
-        # Symbol input with preview
+
         with col_sym:
-            target_symbol: str = (
+            target_symbol = (
                 st.text_input(
                     "Target Company Symbol (e.g., NVDA, AAPL)",
                     value=st.session_state.get("similar_target_sym", "NVDA"),
@@ -76,7 +148,6 @@ def similar_companies_tab_content() -> None:
                 .strip()
                 .upper()
             )
-            # Company preview
             if target_symbol:
                 preview_driver = get_neo4j_driver()
                 try:
@@ -91,7 +162,6 @@ def similar_companies_tab_content() -> None:
                     if hasattr(preview_driver, "close"):
                         preview_driver.close()
 
-        # Embedding family selection
         embedding_family_options: Dict[str, str] = {
             "Combined Financials (all_vec_)": "all_vec_",
             "Income Statement (is_vec_)": "is_vec_",
@@ -107,7 +177,6 @@ def similar_companies_tab_content() -> None:
             )
         family_value = embedding_family_options[family_display]
 
-        # Year range selection
         current_year = datetime.now().year
         col_start, col_end = st.columns(2)
         with col_start:
@@ -126,13 +195,10 @@ def similar_companies_tab_content() -> None:
                 value=current_year-1,
                 key="end_year"
             )
-        
-        # Validate year range
         if start_year > end_year:
             st.error("⚠️ Start year must be before end year")
             st.stop()
 
-        # Sector filtering
         selected_sectors = st.multiselect(
             "Filter by Sector",
             options=sectors,
@@ -140,7 +206,13 @@ def similar_companies_tab_content() -> None:
             key="sector_filter"
         )
 
-        # Aggregation weighting scheme
+        selected_cap_classes = st.multiselect(
+            "Filter by Market Cap Class",
+            options=cap_classes,
+            default=cap_classes,
+            key="cap_class_filter"
+        )
+
         weight_scheme_options: Dict[str, str] = {
             "Equal-weighted mean": "mean",
             "Recency-weighted mean (λ-decay)": "decay",
@@ -156,7 +228,6 @@ def similar_companies_tab_content() -> None:
             )
         weight_value = weight_scheme_options[weight_display]
 
-        # λ slider only when decay selected
         decay_lambda = DEFAULT_DECAY
         with col_lambda:
             if weight_value == "decay":
@@ -170,7 +241,6 @@ def similar_companies_tab_content() -> None:
                     help="Higher λ = more weight on recent years"
                 )
 
-        # Metric selection
         metric_options = [
             "Revenue", "Net Income", "Gross Profit", "Operating Income",
             "Total Assets", "Total Liabilities", "Equity", "Cash",
@@ -183,14 +253,12 @@ def similar_companies_tab_content() -> None:
             key="metric_selection"
         )
 
-        # Number of results
         k = st.slider(
             "Number of Results", 
             5, 50, value=10, step=5, 
             key="similar_k_slider"
         )
 
-    # ---------- Session State Management ----------
     state_keys = [
         ("similar_companies", []),
         ("similar_details", {}),
@@ -202,23 +270,22 @@ def similar_companies_tab_content() -> None:
     for key, default in state_keys:
         st.session_state.setdefault(key, default)
 
-    # ---------- Search Execution ----------
     search_col, _ = st.columns([1, 3])
     with search_col:
         if st.button("🚀 Find Similar Companies", use_container_width=True, type="primary"):
             if not target_symbol:
                 st.warning("⚠️ Please enter a valid company symbol")
                 st.stop()
-                
             if not selected_sectors:
                 st.warning("⚠️ Please select at least one sector")
                 st.stop()
+            if not selected_cap_classes:
+                st.warning("⚠️ Please select at least one market cap class")
+                st.stop()
 
-            # Reset previous results
             for key in ["similar_companies", "similar_details"]:
                 st.session_state[key] = {}
 
-            # Connect & query
             neo_driver = get_neo4j_driver()
             if not neo_driver:
                 st.error("❌ Database connection failed")
@@ -226,27 +293,22 @@ def similar_companies_tab_content() -> None:
 
             with st.spinner(f"🔍 Analyzing {target_symbol} fundamentals..."):
                 try:
-                    # Build query parameters
                     peer_kwargs: Dict[str, Any] = {
                         'target_sym': target_symbol,
                         'embedding_family': family_value,
                         'start_year': start_year,
                         'end_year': end_year,
-                        'k': k + 5,  # Over-fetch for filtering
+                        'k': k + 5,
                         'sectors': selected_sectors,
+                        'cap_classes': selected_cap_classes,
                         'weight_scheme': weight_value,
-                        #'decay': decay_lambda if weight_value == 'decay' else None,
-                        'normalize': True  # Ensure vector normalization
+                        'normalize': True
                     }
-                    
-                    # Handle driver parameter
                     sig_peer = inspect.signature(get_nearest_aggregate_similarities)
                     if 'driver' in sig_peer.parameters:
                         peer_kwargs['driver'] = neo_driver
                     elif '_driver' in sig_peer.parameters:
                         peer_kwargs['_driver'] = neo_driver
-                    
-                    # Execute similarity search
                     peers = get_nearest_aggregate_similarities(**peer_kwargs)
                 except Exception as e:
                     st.error(f"❌ Search failed: {str(e)}")
@@ -258,15 +320,13 @@ def similar_companies_tab_content() -> None:
             if not peers:
                 st.info("ℹ️ No similar companies found with current filters")
                 return
-                
-            # Store results
-            st.session_state.similar_companies = peers[:k]  # Trim to requested size
+
+            st.session_state.similar_companies = peers[:k]
             st.session_state.last_symbol = target_symbol
             st.session_state.last_family = family_display
             st.session_state.last_weight = weight_display
-            st.session_state.metric_year = end_year  # Use last analysis year
+            st.session_state.metric_year = end_year
 
-            # Fetch financial details
             symbols = [sym for sym, _ in peers[:k]]
             with st.spinner("📊 Compiling financial profiles..."):
                 neo_driver = get_neo4j_driver()
@@ -277,12 +337,10 @@ def similar_companies_tab_content() -> None:
                             neo_driver,
                             company_symbols=symbols,
                             year=end_year,
-                            sectors=selected_sectors)# Get latest available data
-                        
+                            sectors=selected_sectors
+                        )
                     else:
-                        # Fallback to default implementation
                         details = fetch_financial_details_for_companies(_driver, company_symbols=symbols)
-                    
                     st.session_state.similar_details = details or {}
                 except Exception as e:
                     st.error(f"❌ Failed to fetch details: {str(e)}")
@@ -291,20 +349,18 @@ def similar_companies_tab_content() -> None:
                     if hasattr(neo_driver, "close"):
                         neo_driver.close()
 
-    # ---------- Results Display ----------
     if st.session_state.similar_companies:
         st.divider()
         st.subheader(
             f"🔎 Companies Similar to {st.session_state.last_symbol} "
             f"({start_year}-{end_year} {family_display.split('(')[0].strip()})"
         )
-        st.caption(f"Aggregation: {weight_display} | Sectors: {', '.join(selected_sectors)}")
+        st.caption(f"Aggregation: {weight_display} | Sectors: {', '.join(selected_sectors)} | Market Cap: {', '.join(selected_cap_classes)}")
         
         peers = st.session_state.similar_companies
         details = st.session_state.similar_details
         metric_year = st.session_state.metric_year or end_year
 
-        # Generate metric display functions
         metric_handlers = {
             "Revenue": lambda m: m.get("revenue"),
             "Net Income": lambda m: m.get("netIncome"),
@@ -327,18 +383,14 @@ def similar_companies_tab_content() -> None:
             )
         }
         
-        # Column layout - dynamic based on metric selection
         num_cols = min(4, len(selected_metrics))
         cols = st.columns(num_cols)
-        
         for idx, (sym, score) in enumerate(peers, start=1):
             meta = details.get(sym, {})
             company_name = meta.get("companyName", sym)
             sector = meta.get("sector", "N/A")
             industry = meta.get("industry", "N/A")
-            
             with st.container():
-                # Header with similarity visual
                 header_col, score_col = st.columns([4, 1])
                 with header_col:
                     st.markdown(f"**{idx}. [{sym}] {company_name}**")
@@ -346,14 +398,11 @@ def similar_companies_tab_content() -> None:
                 with score_col:
                     st.metric("Similarity", f"{score:.0%}")
                     st.progress(float(score), text=f"Cosine: {score:.4f}")
-                
-                # Metrics display
                 col_index = 0
                 for metric in selected_metrics:
                     if col_index >= num_cols:
                         col_index = 0
-                        cols = st.columns(num_cols)  # New row
-                    
+                        cols = st.columns(num_cols)
                     with cols[col_index]:
                         if metric in metric_handlers:
                             value = metric_handlers[metric](meta)
@@ -365,15 +414,4 @@ def similar_companies_tab_content() -> None:
                         else:
                             st.metric(metric, "N/A")
                     col_index += 1
-                
                 st.divider()
-
-
-# In your UI:
-cap_classes = fetch_market_cap_classes(neo_driver)
-selected_cap_classes = st.multiselect(
-    "Filter by Market Cap Class",
-    options=cap_classes,
-    default=cap_classes,
-    key="cap_class_filter"
-)
