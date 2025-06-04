@@ -436,12 +436,19 @@ def build_styled_dataframe(df_long: pd.DataFrame, metrics_to_display: list) -> S
     return styler
     
 @st.cache_data(ttl="1h", show_spinner="Loading vector data for year...")
-def load_vectors_for_similarity(_driver, year: int, family: str = "cf_vec_", sectors: List[str]=None, target_sym: str=None):
+def load_vectors_for_similarity(_driver, year: int, family: str = "cf_vec_", sectors: List[str]=None, cap_classes: List[str]=None, target_sym: str=None):
     prop = f"{family}{year}"
     params = {}
+    filter_clauses = ["c.{prop} IS NOT NULL", "c.ipoDate IS NOT NULL"]
+    if sectors:
+        filter_clauses.append("c.sector IN $sectors")
+        params["sectors"] = sectors
+    if cap_classes:
+        filter_clauses.append("c.marketCapClass IN $cap_classes")
+        params["cap_classes"] = cap_classes
     query = f"""
     MATCH (c:Company)
-    WHERE c.{prop} IS NOT NULL AND c.ipoDate IS NOT NULL
+    WHERE {' AND '.join(filter_clauses)}
     RETURN c.symbol AS sym, c.{prop} AS vec, c.sector AS sector
     """
     try:
@@ -449,15 +456,13 @@ def load_vectors_for_similarity(_driver, year: int, family: str = "cf_vec_", sec
             results = session.run(query, **params)
             all_vecs = {r["sym"]: (np.asarray(r["vec"], dtype=np.float32), r["sector"]) for r in results}
             target_vector = all_vecs.get(target_sym, (None, None))[0]
-            # Filter by sector for candidates, but not for the anchor
-            if sectors:
-                candidate_vecs = {sym: vec for sym, (vec, sector) in all_vecs.items() if sector in sectors and sym != target_sym}
-            else:
-                candidate_vecs = {sym: vec for sym, (vec, sector) in all_vecs.items() if sym != target_sym}
+            # Filter by sector/cap for candidates, but not for the anchor
+            candidate_vecs = {sym: vec for sym, (vec, sector) in all_vecs.items() if sym != target_sym}
             return target_vector, candidate_vecs
     except Exception as e:
         st.error(f"Error loading vectors for {prop}: {e}")
         return None, {}
+
 
 def calculate_similarity_scores(target_vector: np.ndarray, vectors: Dict[str, np.ndarray]) -> Dict[str, float]:
     """Calculates cosine similarity between a target vector and a dictionary of other vectors."""
