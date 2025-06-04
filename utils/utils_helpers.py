@@ -483,16 +483,10 @@ def get_nearest_aggregate_similarities(_driver,
                                        weight_scheme=None,
                                        normalize=True,
                                        k: int = 10) -> List[Tuple[str, float]]:
-    """Aggregates similarity scores over a range of years and returns top k similar companies."""
-    if not _driver:
-        return []
-        
-    cumulative_scores = defaultdict(float)
-    years_processed_count = 0
     
     for year in range(start_year, end_year + 1):
-        yearly_vectors = load_vectors_for_similarity(_driver, year, embedding_family, sectors=sectors)
-
+        yearly_vectors = load_vectors_for_similarity(_driver, year, embedding_family, sectors=sectors)  # <-- add sectors!
+        target_vector = yearly_vectors.pop(target_sym, None)
         
         if target_vector is None:
             # st.warning(f"No vector found for {target_sym} in {year} using {embedding_family}. Skipping year.") # Can be noisy
