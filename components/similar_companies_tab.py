@@ -44,10 +44,15 @@ def fetch_market_cap_classes(driver=None):
 
 # --- Vector Loader with Filtering ---
 @st.cache_data(ttl="1h")
-@st.cache_data(ttl="1h")
-def load_vectors_for_similarity(_driver, year: int, family: str = "cf_vec_", sectors: List[str]=None, cap_classes: List[str]=None, target_sym: str=None):
+def load_vectors_for_similarity(
+    _driver, 
+    year: int, 
+    family: str = "cf_vec_", 
+    sectors: List[str]=None, 
+    cap_classes: List[str]=None, 
+    target_sym: str=None
+):
     prop = f"{family}{year}"
-    # Compose WHERE clause dynamically
     where_clauses = [f"c.{prop} IS NOT NULL", "c.ipoDate IS NOT NULL"]
     if sectors:
         where_clauses.append("c.sector IN $sectors")
