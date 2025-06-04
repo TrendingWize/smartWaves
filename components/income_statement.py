@@ -3,7 +3,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np # Import numpy for np.nan if you prefer that over None
 import plotly.express as px
-from utils.user_auth import (                   # ← pull everything from utils.py instead
+from utils.utils_helpers import (                   # ← pull everything from utils.py instead
     calculate_delta,
     _arrow,
     R_display_metric_card,
