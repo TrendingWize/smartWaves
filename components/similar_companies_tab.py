@@ -4,7 +4,9 @@ import numpy as np
 import inspect
 from datetime import datetime
 from typing import Dict, List, Tuple, Any
-from utils.utils_helpers import (
+
+# Corrected import path
+from utils import (
     get_neo4j_driver,
     get_nearest_aggregate_similarities,
     fetch_financial_details_for_companies,
@@ -12,6 +14,7 @@ from utils.utils_helpers import (
     fetch_sector_list,
     fetch_company_preview
 )
+
 
 DEFAULT_DECAY = 0.7  # λ for recency-weighted mean
 
