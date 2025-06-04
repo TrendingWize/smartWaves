@@ -56,9 +56,9 @@ def load_vectors_for_similarity(
         where_clauses.append("c.marketCapClass IN $cap_classes")
     where_str = " AND ".join(where_clauses)
     query = (
-        f"MATCH (c:Company)\n"
-        f"WHERE {where_str}\n"
-        f"RETURN c.symbol AS sym, c.{prop} AS vec, c.sector AS sector, c.marketCapClass AS cap_class"
+        "MATCH (c:Company)\n"
+        "WHERE {where_str}\n"
+        "RETURN c.symbol AS sym, c.{prop} AS vec, c.sector AS sector, c.marketCapClass AS cap_class"
     )
     params = {}
     if sectors:
