@@ -5,6 +5,9 @@ from pandas.io.formats.style import Styler # pandas ≥1.0
 import numpy as np # Added
 from collections import defaultdict # Added
 from typing import Dict, List, Tuple # Added
+from typing import Any, Dict
+
+
 # ── Neo4j Config ───────────────────────────────────────────────────────
 # Store sensitive credentials securely. In a deployed Streamlit app,
 # use st.secrets (secrets.toml file). For local development, you might
