@@ -13,7 +13,54 @@ NEO4J_URI = st.secrets.get("NEO4J_URI", "neo4j+s://f9f444b7.databases.neo4j.io")
 NEO4J_USER = st.secrets.get("NEO4J_USER", "neo4j")
 NEO4J_PASSWORD = st.secrets.get("NEO4J_PASSWORD", "BhpVJhR0i8NxbDPU29OtvveNE8Wx3X2axPI7mS7zXW0")
 
+# utils.py
 
+def fetch_sector_list(driver=None) -> List[str]:
+    """Fetch distinct sectors from database"""
+    if not driver:
+        driver = get_neo4j_driver()
+    
+    query = """
+    MATCH (s:Sector)
+    RETURN DISTINCT s.name AS sector
+    ORDER BY sector
+    """
+    try:
+        with driver.session() as session:
+            result = session.run(query)
+            return [record["sector"] for record in result]
+    except Exception as e:
+        print(f"Error fetching sectors: {str(e)}")
+        return []
+    finally:
+        if driver and hasattr(driver, 'close'):
+            driver.close()
+
+def fetch_company_preview(symbol: str, driver=None) -> Dict[str, Any]:
+    """Get basic company info"""
+    if not driver:
+        driver = get_neo4j_driver()
+    
+    query = """
+    MATCH (c:Company {symbol: $symbol})
+    RETURN 
+        c.companyName AS companyName,
+        c.sector AS sector,
+        c.industry AS industry,
+        c.description AS description
+    LIMIT 1
+    """
+    try:
+        with driver.session() as session:
+            result = session.run(query, symbol=symbol)
+            record = result.single()
+            return record.data() if record else {}
+    except Exception as e:
+        print(f"Error fetching company preview: {str(e)}")
+        return {}
+    finally:
+        if driver and hasattr(driver, 'close'):
+            driver.close()
 # ── Neo4j Driver Cache ─────────────────────────────────────────────────
 @st.cache_resource
 def get_neo4j_driver():
