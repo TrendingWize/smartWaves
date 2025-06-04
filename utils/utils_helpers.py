@@ -11,6 +11,111 @@ NEO4J_URI = st.secrets.get("NEO4J_URI", "neo4j+s://f9f444b7.databases.neo4j.io")
 NEO4J_USER = st.secrets.get("NEO4J_USER", "neo4j")
 NEO4J_PASSWORD = st.secrets.get("NEO4J_PASSWORD", "BhpVJhR0i8NxbDPU29OtvveNE8Wx3X2axPI7mS7zXW0")
 
+
+def calculate_delta(current_value, previous_value):
+    """
+    Calculates the difference between current and previous values.
+    Returns None if data is insufficient or previous value is zero (to avoid division by zero issues downstream).
+    """
+    if pd.isna(current_value) or pd.isna(previous_value) or previous_value == 0:
+        return None 
+    return current_value - previous_value
+
+def _arrow(prev_val, curr_val, is_percent=False): # is_percent can influence how "better" is judged for some metrics
+    """
+    Generates an HTML span with an arrow indicating change direction.
+    Green up arrow for increase, red down arrow for decrease, neutral for no change or NA.
+    """
+    if pd.isna(prev_val) or pd.isna(curr_val):
+        return " →" # Neutral arrow for missing data
+    
+    # Simple comparison: higher is up, lower is down.
+    # For specific metrics (e.g., expenses), a decrease might be positive.
+    # This function provides a generic visual cue; context is handled by interpretation.
+    if curr_val > prev_val:
+        return " <span style='color:green; font-weight:bold;'>↑</span>"
+    if curr_val < prev_val:
+        return " <span style='color:red; font-weight:bold;'>↓</span>"
+    return " →" # Neutral for no change
+
+
+def R_display_metric_card(st_container, label: str, latest_data: pd.Series, prev_data: pd.Series, 
+                         is_percent: bool = False, is_ratio: bool = False, 
+                         help_text: str = None, currency_symbol: str = "$"):
+    """
+    Displays a styled metric card using st.metric, including value and delta.
+    st_container: The Streamlit container (e.g., st or a column object) to place the metric in.
+    label: The raw metric key (e.g., 'grossProfitMargin').
+    latest_data: Pandas Series containing the latest period's data.
+    prev_data: Pandas Series containing the previous period's data.
+    is_percent: True if the value is a percentage.
+    is_ratio: True if the value is a raw ratio (no currency, specific decimal formatting).
+    help_text: Custom help text for the metric card.
+    currency_symbol: Currency symbol to use for monetary values.
+    """
+    current_val = latest_data.get(label)
+    prev_val = prev_data.get(label)
+    
+    delta_val = calculate_delta(current_val, prev_val)
+    
+    delta_display = None # String for st.metric's delta parameter
+    if delta_val is not None:
+        delta_prefix = ""
+        # Monetary values
+        if not is_percent and not is_ratio:
+            if delta_val > 0: delta_prefix = "+"
+            # Format the absolute delta value with B/M/K suffixes
+            abs_delta_for_format = abs(delta_val)
+            if abs_delta_for_format >= 1_000_000_000: formatted_abs_delta = f"{abs_delta_for_format / 1_000_000_000:.2f}B"
+            elif abs_delta_for_format >= 1_000_000: formatted_abs_delta = f"{abs_delta_for_format / 1_000_000:.2f}M"
+            elif abs_delta_for_format >= 1_000: formatted_abs_delta = f"{abs_delta_for_format / 1_000:.2f}K"
+            else: formatted_abs_delta = f"{abs_delta_for_format:,.0f}" # Default to integer for smaller monetary deltas
+            delta_display = f"{delta_prefix}{formatted_abs_delta}"
+        # Percentage point changes
+        elif is_percent: 
+            delta_display = f"{delta_val:+.2f}pp" # "pp" for percentage points
+        # Raw ratio changes
+        elif is_ratio: 
+            delta_display = f"{delta_val:+.2f}" # Show with sign and 2 decimal places
+
+    # Construct help text string for the metric card
+    current_formatted_val = format_value(current_val, is_percent, currency_symbol if not (is_percent or is_ratio) else "", is_ratio=is_ratio)
+    prev_formatted_val = format_value(prev_val, is_percent, currency_symbol if not (is_percent or is_ratio) else "", is_ratio=is_ratio)
+
+    help_str_parts = []
+    if pd.notna(current_val): help_str_parts.append(f"Latest: {current_formatted_val}")
+    else: help_str_parts.append("Latest: N/A")
+    if pd.notna(prev_val): help_str_parts.append(f"Previous: {prev_formatted_val}")
+    
+    final_help_text_for_metric = " | ".join(help_str_parts)
+    if help_text: # Prepend custom help text if provided
+        final_help_text_for_metric = f"{help_text}\n{final_help_text_for_metric}"
+
+    # Create a more readable display label for the metric card
+    # Common abbreviations and capitalizations
+    display_label = label.replace("Margin", " Mgn").replace("Expenses", " Exp.") \
+                         .replace("Equivalents", "Equiv.").replace("Receivables","Recv.") \
+                         .replace("Payables","Pay.").replace("Liabilities","Liab.") \
+                         .replace("Assets","Ast.").replace("Activities", "Act.") \
+                         .replace("ProvidedByOperating", "Op.").replace("ProvidedByInvesting", "Inv.").replace("ProvidedByFinancing", "Fin.") \
+                         .replace("ProvidedBy", "/").replace("UsedFor","Used For") \
+                         .replace("Expenditure","Exp.").replace("Income", "Inc.") \
+                         .replace("Statement","Stmt.").replace("Interest","Int.") \
+                         .replace("Development","Dev.").replace("Administrative","Admin.") \
+                         .replace("General","Gen.").replace("ShortTerm","ST") \
+                         .replace("LongTerm","LT").replace("Total","Tot.") \
+                         .replace("StockholdersEquity", "Equity").replace("PropertyPlantEquipmentNet", "PP&E (Net)")
+    # Capitalize words, handle "And" -> "&"
+    display_label = ' '.join(word.capitalize() if not word.isupper() else word for word in display_label.replace("And", "&").split())
+
+
+    st_container.metric(
+        label=display_label,
+        value=current_formatted_val if pd.notna(current_val) else "N/A",
+        delta=delta_display,
+        help=final_help_text_for_metric
+    )
+                             
 # ── Neo4j Driver Cache ─────────────────────────────────────────────────
 @st.cache_resource
 def get_neo4j_driver():
