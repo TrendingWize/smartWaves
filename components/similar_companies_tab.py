@@ -1,11 +1,10 @@
 # components/similar_companies_tab.py
-
 import streamlit as st
 import numpy as np
 import inspect
 from datetime import datetime
-from typing import Dict, Any, List, Tuple
-from utils.utils_helpers import (
+from typing import Dict, List, Tuple, Any
+from utils import (
     get_neo4j_driver,
     get_nearest_aggregate_similarities,
     fetch_financial_details_for_companies,
