@@ -44,17 +44,21 @@ def fetch_market_cap_classes(driver=None):
 
 # --- Vector Loader with Filtering ---
 @st.cache_data(ttl="1h")
+@st.cache_data(ttl="1h")
 def load_vectors_for_similarity(_driver, year: int, family: str = "cf_vec_", sectors: List[str]=None, cap_classes: List[str]=None, target_sym: str=None):
     prop = f"{family}{year}"
-    query = f"""
-    MATCH (c:Company)
-    WHERE c.{prop} IS NOT NULL AND c.ipoDate IS NOT NULL
-    """
+    # Compose WHERE clause dynamically
+    where_clauses = [f"c.{prop} IS NOT NULL", "c.ipoDate IS NOT NULL"]
     if sectors:
-        query += " AND c.sector IN $sectors"
+        where_clauses.append("c.sector IN $sectors")
     if cap_classes:
-        query += " AND c.marketCapClass IN $cap_classes"
-    query += "\nRETURN c.symbol AS sym, c.{prop} AS vec, c.sector AS sector, c.marketCapClass AS cap_class"
+        where_clauses.append("c.marketCapClass IN $cap_classes")
+    where_str = " AND ".join(where_clauses)
+    query = (
+        f"MATCH (c:Company)\n"
+        f"WHERE {where_str}\n"
+        f"RETURN c.symbol AS sym, c.{prop} AS vec, c.sector AS sector, c.marketCapClass AS cap_class"
+    )
     params = {}
     if sectors:
         params["sectors"] = sectors
@@ -70,6 +74,7 @@ def load_vectors_for_similarity(_driver, year: int, family: str = "cf_vec_", sec
     except Exception as e:
         st.error(f"Error loading vectors for {prop}: {e}")
         return None, {}
+
 
 # --- Cosine Similarity ---
 def calculate_similarity_scores(target_vector: np.ndarray, vectors: Dict[str, np.ndarray]) -> Dict[str, float]:
