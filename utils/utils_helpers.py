@@ -163,7 +163,7 @@ def fetch_income_statement_data(_driver, symbol: str, start_year: int = 2017) ->
     """
     try:
         with _driver.session(database="neo4j") as session: # Specify database if not default
-            result = session.run(query, symbols=company_symbols, year=year)
+            result = session.run(query, symbols=company_symbols, year=year, sectors=sectors)
             data = [record.data() for record in result]
         
         if not data:
