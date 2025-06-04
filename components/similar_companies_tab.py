@@ -18,6 +18,37 @@ from utils import (
 
 DEFAULT_DECAY = 0.7  # λ for recency-weighted mean
 
+# After fetching the sector list, fetch unique marketCapClass values:
+def fetch_market_cap_classes(driver=None):
+    if not driver:
+        driver = get_neo4j_driver()
+    query = """
+    MATCH (c:Company)
+    WHERE c.marketCapClass IS NOT NULL
+    RETURN DISTINCT c.marketCapClass AS cap_class
+    ORDER BY cap_class
+    """
+    try:
+        with driver.session() as session:
+            result = session.run(query)
+            return [record["cap_class"] for record in result]
+    except Exception as e:
+        print(f"Error fetching market cap classes: {str(e)}")
+        return []
+    finally:
+        if driver and hasattr(driver, 'close'):
+            driver.close()
+
+# In your UI:
+cap_classes = fetch_market_cap_classes(neo_driver)
+selected_cap_classes = st.multiselect(
+    "Filter by Market Cap Class",
+    options=cap_classes,
+    default=cap_classes,
+    key="cap_class_filter"
+)
+
+
 def similar_companies_tab_content() -> None:
     """Render enhanced 'Find Similar Companies' tab"""
     st.title("🔍 Fundamental Similarity Analysis")
