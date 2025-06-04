@@ -438,10 +438,7 @@ def build_styled_dataframe(df_long: pd.DataFrame, metrics_to_display: list) -> S
 @st.cache_data(ttl="1h", show_spinner="Loading vector data for year...")
 def load_vectors_for_similarity(_driver, year: int, family: str = "cf_vec_", sectors: List[str]=None, target_sym: str=None):
     prop = f"{family}{year}"
-    sector_filter = ""
     params = {}
-    # 1. Always fetch the target vector (even if not in sectors)
-    # 2. For other companies, filter by sector if needed
     query = f"""
     MATCH (c:Company)
     WHERE c.{prop} IS NOT NULL AND c.ipoDate IS NOT NULL
@@ -450,22 +447,17 @@ def load_vectors_for_similarity(_driver, year: int, family: str = "cf_vec_", sec
     try:
         with _driver.session(database="neo4j") as session:
             results = session.run(query, **params)
-            all_vecs = {r["sym"]: np.asarray(r["vec"], dtype=np.float32) for r in results}
+            all_vecs = {r["sym"]: (np.asarray(r["vec"], dtype=np.float32), r["sector"]) for r in results}
+            target_vector = all_vecs.get(target_sym, (None, None))[0]
+            # Filter by sector for candidates, but not for the anchor
             if sectors:
-                candidate_vecs = {sym: vec for sym, vec in all_vecs.items() if r["sector"] in sectors and sym != target_sym}
+                candidate_vecs = {sym: vec for sym, (vec, sector) in all_vecs.items() if sector in sectors and sym != target_sym}
             else:
-                candidate_vecs = {sym: vec for sym, vec in all_vecs.items() if sym != target_sym}
-            target_vector = all_vecs.get(target_sym)
+                candidate_vecs = {sym: vec for sym, (vec, sector) in all_vecs.items() if sym != target_sym}
             return target_vector, candidate_vecs
     except Exception as e:
         st.error(f"Error loading vectors for {prop}: {e}")
         return None, {}
-
-# Then in your aggregation function, use:
-target_vector, candidate_vectors = load_vectors_for_similarity(...)
-# And proceed as before.
-
-
 
 def calculate_similarity_scores(target_vector: np.ndarray, vectors: Dict[str, np.ndarray]) -> Dict[str, float]:
     """Calculates cosine similarity between a target vector and a dictionary of other vectors."""
