@@ -1,7 +1,7 @@
 # pages/05_Similarity_Analysis.py
 
 import streamlit as st
-from components.similar_companies_tab import Similar_Analysis
+from components.similar_companies_tab import similar_companies_tab_content
 from utils import initialize_session_state, check_concurrent_login, get_neo4j_driver, fetch_sector_list, fetch_company_preview
 
 # Initialize session state
@@ -27,4 +27,4 @@ if not st.session_state.logged_in:
     st.stop()
 
 # --- Enhanced Similarity Tool UI ---
-Similar_Analysis()
+similar_companies_tab_content()
