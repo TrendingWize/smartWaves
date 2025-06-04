@@ -490,8 +490,8 @@ def get_nearest_aggregate_similarities(_driver,
     cumulative_scores = defaultdict(float)
     years_processed_count = 0
     
-       for year in range(start_year, end_year + 1):
-           yearly_vectors = load_vectors_for_similarity(_driver, year, embedding_family, sectors=sectors)
+    for year in range(start_year, end_year + 1):
+        yearly_vectors = load_vectors_for_similarity(_driver, year, embedding_family, sectors=sectors)
 
         
         if target_vector is None:
