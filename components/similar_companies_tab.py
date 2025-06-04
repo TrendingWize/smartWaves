@@ -253,7 +253,8 @@ def similar_companies_tab_content() -> None:
                         details = fetch_financial_details_for_companies(
                             neo_driver,
                             company_symbols=symbols,
-                            year=end_year  # Get latest available data
+                            year=end_year,
+                            sectors=selected_sectors)# Get latest available data
                         )
                     else:
                         # Fallback to default implementation
