@@ -37,29 +37,29 @@ def fetch_market_cap_classes(driver=None):
     finally:
         if driver and hasattr(driver, 'close'):
             driver.close()
-
+            
 # --- Vector Loader with Filtering ---
 @st.cache_data(ttl="1h")
 def load_vectors_for_similarity(
     _driver, 
     year: int, 
     family: str = "cf_vec_", 
-    sectors: List[str]=None, 
-    cap_classes: List[str]=None, 
-    target_sym: str=None
+    sectors: List[str] = None, 
+    cap_classes: List[str] = None, 
+    target_sym: str = None
 ):
     prop = f"{family}{year}"
-    where_clauses = [f"c.{prop} IS NOT NULL", "c.ipoDate IS NOT NULL"]
+    where_clauses = [f"c.`{prop}` IS NOT NULL", "c.ipoDate IS NOT NULL"]
     if sectors:
         where_clauses.append("c.sector IN $sectors")
     if cap_classes:
         where_clauses.append("c.marketCapClass IN $cap_classes")
     where_str = " AND ".join(where_clauses)
-    query = (
-        "MATCH (c:Company)\n"
-        "WHERE {where_str}\n"
-        "RETURN c.symbol AS sym, c.{prop} AS vec, c.sector AS sector, c.marketCapClass AS cap_class"
-    )
+    query = f"""
+        MATCH (c:Company)
+        WHERE {where_str}
+        RETURN c.symbol AS sym, c.`{prop}` AS vec, c.sector AS sector, c.marketCapClass AS cap_class
+    """
     params = {}
     if sectors:
         params["sectors"] = sectors
@@ -85,6 +85,7 @@ def calculate_similarity_scores(target_vector: np.ndarray, vectors: Dict[str, np
     target_vector /= (np.linalg.norm(target_vector) + 1e-12)
     similarities = matrix_of_vectors @ target_vector
     return dict(zip(vectors.keys(), similarities.astype(float)))
+
 
 # --- Main Similarity Function ---
 @st.cache_data(ttl="1h", show_spinner="Calculating aggregated similarity scores...")
@@ -122,6 +123,7 @@ def get_nearest_aggregate_similarities(_driver,
     average_scores = {sym: score / years_processed_count for sym, score in cumulative_scores.items()}
     best_k_similar = sorted(average_scores.items(), key=lambda item: item[1], reverse=True)[:k]
     return best_k_similar
+
 
 # --- UI Function ---
 def similar_companies_tab_content() -> None:
