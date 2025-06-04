@@ -136,8 +136,8 @@ def fetch_income_statement_data(_driver, symbol: str, start_year: int = 2017) ->
 
     query = """
     MATCH (c:Company)-[:HAS_INCOME_STATEMENT]->(i:IncomeStatement)
-    WHERE i.revenue IS NOT NULL // Basic data quality check
-      AND c.symbol = $sym
+    WHERE c.symbol IN $symbols
+      AND ($year IS NULL OR i.calendarYear = $year)
       AND i.fillingDate.year >= $start_yr
     RETURN
       i.fillingDate.year                     AS year,
@@ -162,7 +162,7 @@ def fetch_income_statement_data(_driver, symbol: str, start_year: int = 2017) ->
     """
     try:
         with _driver.session(database="neo4j") as session: # Specify database if not default
-            result = session.run(query, sym=symbol, start_yr=start_year)
+            result = session.run(query, symbols=company_symbols, year=year)
             data = [record.data() for record in result]
         
         if not data:
@@ -524,9 +524,11 @@ def get_nearest_aggregate_similarities(_driver,
 
 
 @st.cache_data(ttl="1h", show_spinner="Fetching financial details for similar companies...")
-def fetch_financial_details_for_companies(_driver, company_symbols: List[str]) -> Dict[str, Dict]:
-    if not _driver or not company_symbols:
-        return {}
+def fetch_financial_details_for_companies(
+    _driver, 
+    company_symbols: List[str], 
+    year: int = None) -> Dict[str, Dict]:
+
 
 
 
