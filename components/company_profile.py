@@ -2,7 +2,7 @@
 
 import streamlit as st
 import pandas as pd # Though we might not need pandas much for this display
-from utils import get_neo4j_driver 
+from utils.utils_helpers  import get_neo4j_driver 
 
 @st.cache_data(ttl="1h") # Cache the profile data
 def fetch_company_profile_data(_driver, symbol: str):
