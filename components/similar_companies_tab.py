@@ -1,314 +1,291 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
 import inspect
 from datetime import datetime
-from typing import Dict, Any
+from typing import Dict, Any, List, Tuple
 
 from utils import (
     get_neo4j_driver,
     get_nearest_aggregate_similarities,
     fetch_financial_details_for_companies,
     format_value,
+    fetch_sector_list,  # New utility function
+    fetch_company_preview,  # New utility function
 )
 
-
 # --------------------------------------------------------------------------------------
-# Streamlit tab builder – "Similar Companies" with configurable aggregation weighting
+# Streamlit tab builder – "Similar Companies" with enhanced features
 # --------------------------------------------------------------------------------------
 
-DEFAULT_DECAY = 0.7  # λ for recency‑weighted mean when no slider provided
-
+DEFAULT_DECAY = 0.7  # λ for recency-weighted mean
 
 def similar_companies_tab_content() -> None:
-    """Render the *Find Similar Companies* tab.
-
-    Users can choose the embedding family **and** how yearly vectors are aggregated:
-    * Equal‑weighted mean (long‑term similarity)
-    * Recency‑weighted mean (λ‑decay, emphasises recent fundamentals)
-    * Latest year only (most current snapshot)
+    """Render enhanced 'Find Similar Companies' tab with:
+    - Year range selection
+    - Sector/industry filtering
+    - Combined embeddings option
+    - Visual similarity indicators
+    - Metric customization
+    - Company previews
     """
+    st.title("🔍 Advanced Company Similarity Finder")
+    st.markdown("""
+    Discover fundamentally similar companies using financial statement embeddings.
+    *Features:* Custom time ranges, sector filters, metric selection & visual comparisons.
+    """)
 
-    # ---------- Header & Intro ----------
-    st.title("🔗 Find Similar Companies")
-    st.markdown(
-        "Discover companies with similar financial‑statement embeddings, "
-        "with a choice of **how** yearly vectors are aggregated."
-    )
-
-    # ---------- User Inputs ----------
-    col_sym, col_family = st.columns([2, 2])
-    with col_sym:
-        target_symbol: str = (
-            st.text_input(
-                "Target Company Symbol (e.g., NVDA, AAPL)",
-                value=st.session_state.get("similar_target_sym", "NVDA"),
-                key="similar_symbol_input",
+    # ---------- User Inputs Section ----------
+    with st.expander("🔧 Search Parameters", expanded=True):
+        col_sym, col_family = st.columns([2, 2])
+        
+        # Symbol input with preview
+        with col_sym:
+            target_symbol: str = (
+                st.text_input(
+                    "Target Company Symbol (e.g., NVDA, AAPL)",
+                    value=st.session_state.get("similar_target_sym", "NVDA"),
+                    key="similar_symbol_input",
+                )
+                .strip()
+                .upper()
             )
-            .strip()
-            .upper()
-        )
+            # Company preview
+            if target_symbol:
+                with st.spinner("Fetching company info..."):
+                    preview = fetch_company_preview(target_symbol)
+                if preview:
+                    st.caption(f"**{preview['companyName']}** | {preview['sector']} | {preview['industry']}")
+                else:
+                    st.warning("Symbol not found in database")
 
-    # Embedding family (which statement vectors)
-    embedding_family_options: Dict[str, str] = {
-        "Cash‑Flow (cf_vec_)": "cf_vec_",
-        "Income‑Statement (is_vec_)": "is_vec_",
-        "Balance‑Sheet (bs_vec_)": "bs_vec_",
-    }
-    with col_family:
-        family_display = st.selectbox(
-            "Similarity Type (Embedding Family)",
-            options=list(embedding_family_options.keys()),
-            index=0,
-            key="similar_family_select",
-        )
-    family_value = embedding_family_options[family_display]
-
-    # Aggregation weighting scheme -------------------------------
-    weight_scheme_options: Dict[str, str] = {
-        "Equal‑weighted mean": "mean",
-        "Recency‑weighted mean (λ‑decay)": "decay",
-        "Latest year only": "latest",
-    }
-    col_ws, col_lambda = st.columns([2, 1])
-    with col_ws:
-        weight_display = st.selectbox(
-            "Aggregation Weighting Scheme",
-            options=list(weight_scheme_options.keys()),
-            index=0,
-            key="similar_weight_scheme_select",
-        )
-    weight_value = weight_scheme_options[weight_display]
-
-    # λ slider only when decay selected
-    decay_lambda = DEFAULT_DECAY
-    with col_lambda:
-        if weight_value == "decay":
-            decay_lambda = st.slider(
-                "λ (decay factor)",
-                min_value=0.5,
-                max_value=0.95,
-                value=DEFAULT_DECAY,
-                step=0.05,
-                key="similar_decay_slider",
+        # Embedding family selection
+        embedding_family_options: Dict[str, str] = {
+            "Combined Financials (all_vec_)": "all_vec_",
+            "Income Statement (is_vec_)": "is_vec_",
+            "Balance Sheet (bs_vec_)": "bs_vec_",
+            "Cash Flow (cf_vec_)": "cf_vec_",
+        }
+        with col_family:
+            family_display = st.selectbox(
+                "Embedding Type",
+                options=list(embedding_family_options.keys()),
+                index=0,
+                key="similar_family_select",
             )
+        family_value = embedding_family_options[family_display]
 
-    # Year range – always up to LAST full financial year
-    end_similarity_year = datetime.now().year - 1
-    start_similarity_year = end_similarity_year - 5  # 5‑year window by default
+        # Year range selection
+        current_year = datetime.now().year
+        col_start, col_end = st.columns(2)
+        with col_start:
+            start_year = st.number_input(
+                "Start Year", 
+                min_value=1990, 
+                max_value=current_year-1,
+                value=current_year-5,
+                key="start_year"
+            )
+        with col_end:
+            end_year = st.number_input(
+                "End Year", 
+                min_value=1990, 
+                max_value=current_year,
+                value=current_year-1,
+                key="end_year"
+            )
+        
+        # Validate year range
+        if start_year > end_year:
+            st.error("Start year must be before end year")
+            st.stop()
 
-    # Number of peers to surface
-    k = st.slider(
-        "Number of Similar Companies", 5, 25, value=10, step=1, key="similar_k_slider"
-    )
+        # Sector filtering
+        sectors = fetch_sector_list()
+        selected_sectors = st.multiselect(
+            "Filter by Sector",
+            options=sectors,
+            default=sectors,
+            key="sector_filter"
+        )
 
-    # ---------- Session‑state keys ----------
-    for key, default in [
+        # Aggregation weighting scheme
+        weight_scheme_options: Dict[str, str] = {
+            "Equal-weighted mean": "mean",
+            "Recency-weighted mean (λ-decay)": "decay",
+            "Latest year only": "latest",
+        }
+        col_ws, col_lambda = st.columns([2, 1])
+        with col_ws:
+            weight_display = st.selectbox(
+                "Time Weighting",
+                options=list(weight_scheme_options.keys()),
+                index=0,
+                key="similar_weight_scheme_select",
+            )
+        weight_value = weight_scheme_options[weight_display]
+
+        # λ slider only when decay selected
+        decay_lambda = DEFAULT_DECAY
+        with col_lambda:
+            if weight_value == "decay":
+                decay_lambda = st.slider(
+                    "λ (decay factor)",
+                    min_value=0.5,
+                    max_value=0.95,
+                    value=DEFAULT_DECAY,
+                    step=0.05,
+                    key="similar_decay_slider",
+                    help="Higher λ = more weight on recent years"
+                )
+
+        # Metric selection
+        metric_options = [
+            "Revenue", "Net Income", "Gross Profit", "Operating Income",
+            "Total Assets", "Total Liabilities", "Equity", "Cash",
+            "Operating Cash Flow", "Free Cash Flow", "CapEx", "ROE", "Current Ratio"
+        ]
+        selected_metrics = st.multiselect(
+            "Key Metrics to Compare",
+            options=metric_options,
+            default=metric_options[:8],
+            key="metric_selection"
+        )
+
+        # Number of results
+        k = st.slider(
+            "Number of Results", 
+            5, 50, value=10, step=5, 
+            key="similar_k_slider"
+        )
+
+    # ---------- Session State Management ----------
+    state_keys = [
         ("similar_companies", []),
         ("similar_details", {}),
         ("last_symbol", None),
         ("last_family", None),
         ("last_weight", None),
-    ]:
+        ("metric_year", None)
+    ]
+    for key, default in state_keys:
         st.session_state.setdefault(key, default)
 
-    # ---------- Trigger search ----------
-    trigger_col, _ = st.columns([1, 3])
-    with trigger_col:
-        if st.button("🚀 Find Similar Companies", use_container_width=True):
+    # ---------- Search Execution ----------
+    search_col, _ = st.columns([1, 3])
+    with search_col:
+        if st.button("🚀 Find Similar Companies", use_container_width=True, type="primary"):
             if not target_symbol:
-                st.warning("Please enter a company symbol first.")
+                st.warning("Please enter a valid company symbol")
+                st.stop()
+                
+            if not selected_sectors:
+                st.warning("Please select at least one sector")
                 st.stop()
 
             # Reset previous results
-            st.session_state.similar_companies = []
-            st.session_state.similar_details = {}
+            for key in ["similar_companies", "similar_details"]:
+                st.session_state[key] = {}
 
             # Connect & query
             neo_driver = get_neo4j_driver()
             if not neo_driver:
-                st.error("Database connection failed.")
+                st.error("Database connection failed")
                 st.stop()
 
-            with st.spinner(f"Computing peers for {target_symbol} …"):
+            with st.spinner(f"Analyzing {target_symbol} fundamentals..."):
                 try:
-                    # Build kwargs dynamically to match whatever signature utils provides
+                    # Build query parameters
                     peer_kwargs: Dict[str, Any] = {
                         'target_sym': target_symbol,
                         'embedding_family': family_value,
-                        'start_year': start_similarity_year,
-                        'end_year': end_similarity_year,
-                        'k': k,
+                        'start_year': start_year,
+                        'end_year': end_year,
+                        'k': k + 5,  # Over-fetch for filtering
+                        'sectors': selected_sectors,
+                        'weight_scheme': weight_value,
+                        'decay': decay_lambda if weight_value == 'decay' else None,
+                        'normalize': True  # Ensure vector normalization
                     }
-                    # Choose driver arg name based on signature to avoid cache hashing errors
+                    
+                    # Handle driver parameter
                     sig_peer = inspect.signature(get_nearest_aggregate_similarities)
-                    if '_driver' in sig_peer.parameters:
-                        peer_kwargs['_driver'] = neo_driver
-                    else:
-                        peer_kwargs['driver'] = neo_driver
-                    if 'weight_scheme' in sig_peer.parameters:
-                        peer_kwargs['weight_scheme'] = weight_value
-                    if 'decay' in sig_peer.parameters:
-                        peer_kwargs['decay'] = decay_lambda if weight_value == 'decay' else None
-
+                    peer_kwargs['driver' if 'driver' in sig_peer.parameters else '_driver'] = neo_driver
+                    
+                    # Execute similarity search
                     peers = get_nearest_aggregate_similarities(**peer_kwargs)
+                except Exception as e:
+                    st.error(f"Search failed: {str(e)}")
+                    return
                 finally:
-                    if hasattr(neo_driver, "close"):
-                        neo_driver.close()
+                    neo_driver.close() if hasattr(neo_driver, "close") else None
 
-            st.session_state.similar_companies = peers or []
+            if not peers:
+                st.info("No similar companies found with current filters")
+                return
+                
+            # Store results
+            st.session_state.similar_companies = peers[:k]  # Trim to requested size
             st.session_state.last_symbol = target_symbol
             st.session_state.last_family = family_display
             st.session_state.last_weight = weight_display
+            st.session_state.metric_year = end_year  # Use last analysis year
 
-            # Fetch fundamentals for display (only if peers returned)
-            if peers:
-                symbols = [sym for sym, _ in peers]
-                with st.spinner("Fetching financial details …"):
-                    neo_driver = get_neo4j_driver()
-                    try:
-                        sig_det = inspect.signature(fetch_financial_details_for_companies)
-                        # Decide driver argument position/name
-                        if '_driver' in sig_det.parameters or 'driver' in sig_det.parameters:
-                            # Pass both parameters positionally to side‑step keyword mismatch
-                            details = fetch_financial_details_for_companies(neo_driver, symbols)
-                        else:
-                            # Fallback: try keyword 'symbols' only
-                            details = fetch_financial_details_for_companies(symbols=symbols)
-                    finally:
-                        if hasattr(neo_driver, "close"):
-                            neo_driver.close()
-                st.session_state.similar_details = details or {}
+            # Fetch financial details
+            symbols = [sym for sym, _ in peers[:k]]
+            with st.spinner("Compiling financial profiles..."):
+                neo_driver = get_neo4j_driver()
+                try:
+                    details = fetch_financial_details_for_companies(
+                        symbols=symbols,
+                        year=end_year  # Get latest available data
+                    )
+                    st.session_state.similar_details = details or {}
+                finally:
+                    neo_driver.close() if hasattr(neo_driver, "close") else None
 
-            st.rerun()
-
-    # ---------- Display results ----------
-    if st.session_state.last_symbol:
-        st.markdown("---")
+    # ---------- Results Display ----------
+    if st.session_state.similar_companies:
+        st.divider()
         st.subheader(
-            f"Top {k} companies similar to **{st.session_state.last_symbol}** "
-            f"using **{st.session_state.last_family}** vectors "
-            f"aggregated via **{st.session_state.last_weight}**"
+            f"🔎 Companies Similar to {st.session_state.last_symbol} "
+            f"({start_year}-{end_year} {family_display.split('(')[0].strip()})"
         )
-
+        st.caption(f"Aggregation: {weight_display} | Sectors: {', '.join(selected_sectors)}")
+        
         peers = st.session_state.similar_companies
-        if not peers:
-            st.info("No similar companies found with the selected parameters.")
-            return
-
         details = st.session_state.similar_details
+        metric_year = st.session_state.metric_year
+
+        # Generate metric display functions
+        metric_handlers = {
+            "Revenue": lambda m: m.get("revenue"),
+            "Net Income": lambda m: m.get("netIncome"),
+            "Gross Profit": lambda m: m.get("grossProfit"),
+            "Operating Income": lambda m: m.get("operatingIncome"),
+            "Total Assets": lambda m: m.get("totalAssets"),
+            "Total Liabilities": lambda m: m.get("totalLiabilities"),
+            "Equity": lambda m: m.get("totalStockholdersEquity"),
+            "Cash": lambda m: m.get("cashAndCashEquivalents"),
+            "Operating Cash Flow": lambda m: m.get("operatingCashFlow"),
+            "Free Cash Flow": lambda m: m.get("freeCashFlow"),
+            "CapEx": lambda m: m.get("capitalExpenditure"),
+            "ROE": lambda m: (m.get("netIncome") / m.get("totalStockholdersEquity") 
+                            if m.get("totalStockholdersEquity") else None,
+            "Current Ratio": lambda m: (m.get("totalCurrentAssets") / m.get("totalCurrentLiabilities") 
+                                    if m.get("totalCurrentLiabilities") else None
+        }
+        
+        # Column layout - dynamic based on metric selection
+        num_cols = min(4, len(selected_metrics))
+        cols = st.columns(num_cols)
+        
         for idx, (sym, score) in enumerate(peers, start=1):
             meta = details.get(sym, {})
             company_name = meta.get("companyName", sym)
             sector = meta.get("sector", "N/A")
             industry = meta.get("industry", "N/A")
-
+            
             with st.container():
-                st.markdown(f"**{idx}. {company_name} ({sym})** — similarity **{score:.4f}**")
-                st.caption(f"Sector: {sector} | Industry: {industry}")
-
-                col_is, col_bs, col_cf = st.columns(3)
-
-                with col_is:
-                    st.markdown("###### Income Statement")
-                    st.metric("Revenue", format_value(meta.get("revenue")))
-                    st.metric("Net Income", format_value(meta.get("netIncome")))
-                    st.metric("Operating Inc.", format_value(meta.get("operatingIncome")))
-                    st.metric("Gross Profit", format_value(meta.get("grossProfit")))
-
-                with col_bs:
-                    st.markdown("###### Balance Sheet")
-                    st.metric("Assets", format_value(meta.get("totalAssets")))
-                    st.metric("Liabilities", format_value(meta.get("totalLiabilities")))
-                    st.metric("Equity", format_value(meta.get("totalStockholdersEquity")))
-                    st.metric("Cash", format_value(meta.get("cashAndCashEquivalents")))
-
-                with col_cf:
-                    st.markdown("###### Cash‑Flow")
-                    st.metric("Op. CF", format_value(meta.get("operatingCashFlow")))
-                    st.metric("Free CF", format_value(meta.get("freeCashFlow")))
-                    st.metric("Δ Cash", format_value(meta.get("netChangeInCash")))
-                    st.metric("CapEx", format_value(meta.get("capitalExpenditure")))
-                st.markdown("---")
-
-
-# --------------------------------------------------------------------------------------
-# Stand‑alone demo mode – lightweight mocks so the file is runnable without the full app
-# --------------------------------------------------------------------------------------
-if __name__ == "__main__":
-
-    class _MockDriver:
-        """Very small Neo4j stub sufficient for demo."""
-
-        def close(self):
-            pass
-
-    def get_neo4j_driver():  # type: ignore
-        return _MockDriver()
-
-    # Fake utils behaviours ---------------------------------------------------
-    def get_nearest_aggregate_similarities(  # type: ignore
-        *,
-        driver,  # noqa: ANN001
-        target_sym: str,
-        embedding_family: str,
-        start_year: int,
-        end_year: int,
-        k: int,
-        weight_scheme: str,
-        decay: float | None = None,
-    ):
-        rng = np.random.default_rng(hash(target_sym) & 0xFFFF)
-        peers = [
-            (sym, float(rng.uniform(0.8, 0.95)))
-            for sym in ["AMD", "INTC", "QCOM", "TSM", "AVGO"][:k]
-        ]
-        return peers
-
-    def fetch_financial_details_for_companies(  # type: ignore
-        driver, symbols  # noqa: ANN001
-    ):
-        return {
-            s: {
-                "companyName": f"{s} Inc.",
-                "sector": "Tech",
-                "industry": "Semiconductors",
-                "revenue": 1_000_000_000,
-                "netIncome": 120_000_000,
-                "operatingIncome": 200_000_000,
-                "grossProfit": 500_000_000,
-                "totalAssets": 2_000_000_000,
-                "totalLiabilities": 800_000_000,
-                "totalStockholdersEquity": 1_200_000_000,
-                "cashAndCashEquivalents": 300_000_000,
-                "operatingCashFlow": 260_000_000,
-                "freeCashFlow": 150_000_000,
-                "netChangeInCash": 60_000_000,
-                "capitalExpenditure": -100_000_000,
-            }
-            for s in symbols
-        }
-
-    def format_value(value):  # type: ignore
-        if value is None:
-            return "N/A"
-        abs_val = abs(value)
-        if abs_val >= 1e9:
-            return f"${value / 1e9:,.2f} B"
-        if abs_val >= 1e6:
-            return f"${value / 1e6:,.2f} M"
-        return f"${value:,.0f}"
-
-    # Monkey‑patch the names imported at the top so our demo uses these mocks
-    import sys as _sys
-
-    _sys.modules[__name__].get_neo4j_driver = get_neo4j_driver  # type: ignore
-    _sys.modules[__name__].get_nearest_aggregate_similarities = (
-        get_nearest_aggregate_similarities  # type: ignore
-    )
-    _sys.modules[__name__].fetch_financial_details_for_companies = (
-        fetch_financial_details_for_companies  # type: ignore
-    )
-    _sys.modules[__name__].format_value = format_value  # type: ignore
-
-    st.set_page_config(layout="wide")
-    similar_companies_tab_content()
+                # Header with similarity visual
+                header_col, score
