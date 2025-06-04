@@ -251,7 +251,7 @@ def similar_companies_tab_content() -> None:
                     sig_det = inspect.signature(fetch_financial_details_for_companies)
                     if 'year' in sig_det.parameters:
                         details = fetch_financial_details_for_companies(
-                            _driver,
+                            neo_driver,
                             company_symbols=symbols,
                             year=end_year  # Get latest available data
                         )
