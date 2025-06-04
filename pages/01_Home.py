@@ -1,6 +1,6 @@
 # smart_waves/pages/01_Home.py
 import streamlit as st
-from utils import check_concurrent_login, initialize_session_state
+from utils.user_auth  import check_concurrent_login, initialize_session_state
 
 initialize_session_state() # Ensure session state is set up
 
