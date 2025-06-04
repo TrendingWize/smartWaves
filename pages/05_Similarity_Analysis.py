@@ -5,7 +5,7 @@ import streamlit as st
 st.set_page_config(page_title="Fundamental Similarity Analysis", layout="wide")
 
 from components.similar_companies_tab import similar_companies_tab_content
-from utils import initialize_session_state, check_concurrent_login, create_user_table # For auth
+from utils.user_auth import initialize_session_state, check_concurrent_login, create_user_table # For auth
 
 # Initialize session state (idempotent)
 initialize_session_state()
