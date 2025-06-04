@@ -7,6 +7,7 @@ from collections import defaultdict # Added
 from typing import Dict, List, Tuple # Added
 from typing import Any, Dict, List, Optional
 
+cumulative_scores = defaultdict(float)
 # ── Neo4j Config ───────────────────────────────────────────────────────
 # Store sensitive credentials securely. In a deployed Streamlit app,
 # use st.secrets (secrets.toml file). For local development, you might
