@@ -138,6 +138,7 @@ def fetch_income_statement_data(_driver, symbol: str, start_year: int = 2017) ->
     MATCH (c:Company)-[:HAS_INCOME_STATEMENT]->(i:IncomeStatement)
     WHERE c.symbol IN $symbols
       AND ($year IS NULL OR i.calendarYear = $year)
+      AND ($sectors IS NULL OR c.sector IN $sectors)
       AND i.fillingDate.year >= $start_yr
     RETURN
       i.fillingDate.year                     AS year,
