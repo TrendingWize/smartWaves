@@ -201,7 +201,7 @@ def similar_companies_tab_content() -> None:
                 try:
                     # Call the imported get_nearest_aggregate_similarities
                     peers = get_nearest_aggregate_similarities(
-                        driver=neo_driver, # Pass the main driver
+                        _driver=neo_driver, # Pass the main driver
                         target_sym=target_symbol,
                         embedding_family=family_value,
                         start_year=start_year,
