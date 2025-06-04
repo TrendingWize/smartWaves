@@ -5,7 +5,55 @@ import numpy as np
 from datetime import datetime
 from typing import Dict, List, Tuple, Any
 from .user_auth import ( ... )
-from .utils_helpers import ( ... ) # --- Neo4j and Data Helpers (from utils.utils_helpers) ---
+
+from .utils_helpers import (
+    # Neo4j connection
+    get_neo4j_driver,
+
+    # Neo4j data fetching for similarity
+    fetch_market_cap_classes,
+    load_vectors_for_similarity,
+    calculate_similarity_scores,
+    get_nearest_aggregate_similarities,
+
+    # Other Neo4j data fetching
+    fetch_sector_list,
+    fetch_company_preview,
+    fetch_financial_details_for_companies,
+    fetch_income_statement_data,
+
+    # Formatting utilities
+    format_value
+    # Add any other functions from utils_helpers.py you want to expose
+)
+
+from .user_auth import (
+    # Database connection & setup
+    get_db_connection,
+    create_user_table,
+
+    # Password hashing (ensure these match your user_auth.py)
+    # generate_salt, # If defined and needed externally
+    hash_password,
+    verify_password,
+
+    # User management
+    add_user,
+    get_user,
+    get_unapproved_users,
+    approve_user,
+    update_session_token,
+
+    # Session state
+    initialize_session_state,
+
+    # Login/Logout
+    login_user,
+    logout_user,
+    check_concurrent_login
+)
+
+
 from utils import ( # Assuming you've moved auth functions to utils/user_auth.py
     get_db_connection,
     create_user_table,
