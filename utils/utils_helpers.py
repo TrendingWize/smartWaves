@@ -476,6 +476,7 @@ def calculate_similarity_scores(target_vector: np.ndarray, vectors: Dict[str, np
 
 
 @st.cache_data(ttl="1h", show_spinner="Calculating aggregated similarity scores...")
+@st.cache_data(ttl="1h", show_spinner="Calculating aggregated similarity scores...")
 def get_nearest_aggregate_similarities(_driver, 
                                        target_sym: str, 
                                        embedding_family: str, 
@@ -487,6 +488,29 @@ def get_nearest_aggregate_similarities(_driver,
                                        k: int = 10) -> List[Tuple[str, float]]:
     if not _driver:
         return []
+
+    cumulative_scores = defaultdict(float)
+    years_processed_count = 0
+
+    for year in range(start_year, end_year + 1):
+        target_vector, candidate_vectors = load_vectors_for_similarity(
+            _driver, year, embedding_family, sectors=sectors, target_sym=target_sym
+        )
+        if target_vector is None or not candidate_vectors:
+            continue
+        yearly_similarity_scores = calculate_similarity_scores(target_vector, candidate_vectors)
+        for sym, score in yearly_similarity_scores.items():
+            cumulative_scores[sym] += score
+        years_processed_count += 1
+
+    if years_processed_count == 0:
+        st.warning(f"No data found for {target_sym} or its comparables in the selected year range and embedding family.")
+        return []
+
+    average_scores = {sym: score / years_processed_count for sym, score in cumulative_scores.items()}
+    best_k_similar = sorted(average_scores.items(), key=lambda item: item[1], reverse=True)[:k]
+    return best_k_similar
+
     
     cumulative_scores = defaultdict(float)  # <-- REQUIRED
     years_processed_count = 0
