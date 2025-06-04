@@ -5,16 +5,35 @@ import numpy as np
 from datetime import datetime
 from typing import Dict, List, Tuple, Any
 
-# Import consolidated and fixed helpers from the utils package
-from utils import (
+# --- Neo4j and Data Helpers (from utils.utils_helpers) ---
+from .utils_helpers import ( # Correct: relative import from sibling module
     get_neo4j_driver,
-    fetch_financial_details_for_companies,
+    fetch_market_cap_classes,
+    load_vectors_for_similarity,
+    calculate_similarity_scores,
+    get_nearest_aggregate_similarities,
     fetch_sector_list,
     fetch_company_preview,
-    fetch_market_cap_classes, # Added this import
-    get_nearest_aggregate_similarities, # Using the consolidated one
+    fetch_financial_details_for_companies,
+    fetch_income_statement_data,
     format_value
 )
+
+
+__all__ = [
+    # Auth
+    "get_db_connection", "create_user_table", "hash_password", "verify_password",
+    "add_user", "get_user", "get_unapproved_users", "approve_user",
+    "update_session_token", "initialize_session_state", "login_user", "logout_user",
+    "check_concurrent_login",
+
+    # Neo4j & Data
+    "get_neo4j_driver", "fetch_market_cap_classes", "load_vectors_for_similarity",
+    "calculate_similarity_scores", "get_nearest_aggregate_similarities",
+    "fetch_sector_list", "fetch_company_preview",
+    "fetch_financial_details_for_companies", "fetch_income_statement_data",
+    "format_value",
+]
 
 DEFAULT_DECAY = 0.7  # λ for recency-weighted mean
 
