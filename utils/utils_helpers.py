@@ -435,32 +435,27 @@ def build_styled_dataframe(df_long: pd.DataFrame, metrics_to_display: list) -> S
     return styler
     
 @st.cache_data(ttl="1h", show_spinner="Loading vector data for year...")
-def load_vectors_for_similarity(_driver, year: int, family: str = "cf_vec_") -> Dict[str, np.ndarray]:
-    """Loads company vectors for a given year and embedding family."""
-    if not _driver:
-        return {}
+def load_vectors_for_similarity(_driver, year: int, family: str = "cf_vec_", sectors: List[str]=None) -> Dict[str, np.ndarray]:
     prop = f"{family}{year}"
-    # Updated query: also filter by companies that HAVE an IPO date (implicitly filters out non-public, etc.)
-    # and where the IPO date is reasonably in the past to ensure data quality.
-    # The c.ipoDate.year <= 2017 was in the original, but might be too restrictive if we want recent similarities.
-    # Let's make the ipoDate filter more dynamic or based on the 'year' being queried.
-    # For now, let's assume 'year' implies data availability for that year.
-    # The original `c.ipoDate.year <= 2017` might be specific to the dataset used to generate those vectors.
-    # If vectors are generated annually, this might not be needed. For now, let's keep it simpler.
+    sector_filter = ""
+    if sectors:
+        sector_filter = "AND c.sector IN $sectors"
     query = f"""
     MATCH (c:Company)
-    WHERE c.{prop} IS NOT NULL AND c.ipoDate IS NOT NULL 
+    WHERE c.{prop} IS NOT NULL AND c.ipoDate IS NOT NULL {sector_filter}
     RETURN c.symbol AS sym, c.{prop} AS vec
     """
-    # Parameters are not directly supported for property names in WHERE c.{prop}, so f-string is used.
-    # This is generally safe if `family` and `year` are controlled inputs.
     try:
         with _driver.session(database="neo4j") as session:
-            results = session.run(query)
+            params = {}
+            if sectors:
+                params["sectors"] = sectors
+            results = session.run(query, **params)
             return {r["sym"]: np.asarray(r["vec"], dtype=np.float32) for r in results}
     except Exception as e:
         st.error(f"Error loading vectors for {prop}: {e}")
         return {}
+
 
 def calculate_similarity_scores(target_vector: np.ndarray, vectors: Dict[str, np.ndarray]) -> Dict[str, float]:
     """Calculates cosine similarity between a target vector and a dictionary of other vectors."""
