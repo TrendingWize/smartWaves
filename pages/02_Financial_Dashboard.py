@@ -4,8 +4,8 @@ st.set_page_config(page_title="Financial Dashboard", layout="wide")
 
 import sys
 import os
-from utils import logout_user
-from utils import check_concurrent_login, initialize_session_state # This should now work
+from utils.user_auth import logout_user
+from utils.user_auth import check_concurrent_login, initialize_session_state # This should now work
 from components.company_profile import company_profile_tab_content
 from components.income_statement import income_statement_tab_content
 from components.balance_sheet import balance_sheet_tab_content
