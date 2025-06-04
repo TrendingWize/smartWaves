@@ -5,8 +5,7 @@ from pandas.io.formats.style import Styler # pandas ≥1.0
 import numpy as np # Added
 from collections import defaultdict # Added
 from typing import Dict, List, Tuple # Added
-from typing import Any, Dict
-
+from typing import Any, Dict, List, Optional
 
 # ── Neo4j Config ───────────────────────────────────────────────────────
 # Store sensitive credentials securely. In a deployed Streamlit app,
