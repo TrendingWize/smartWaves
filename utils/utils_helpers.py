@@ -528,7 +528,8 @@ def fetch_financial_details_for_companies(
     _driver, 
     company_symbols: List[str], 
     year: int = None,
-sector=None) -> Dict[str, Dict]:
+    sectors: List[str] = None
+) -> Dict[str, Dict]:
 
 
 
