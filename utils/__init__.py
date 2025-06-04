@@ -4,7 +4,7 @@ import numpy as np
 # import inspect # No longer strictly needed for param checking if signatures are consistent
 from datetime import datetime
 from typing import Dict, List, Tuple, Any
-
+from .user_auth import
 # --- Neo4j and Data Helpers (from utils.utils_helpers) ---
 from utils import ( # Assuming you've moved auth functions to utils/user_auth.py
     get_db_connection,
@@ -42,6 +42,19 @@ __all__ = [
     "get_db_connection", "create_user_table", "hash_password", "verify_password",
     "add_user", "get_user", "get_unapproved_users", "approve_user",
     "update_session_token", "initialize_session_state", "login_user", "logout_user",
+    "check_concurrent_login",    # From user_auth.py
+    "get_db_connection",
+    "create_user_table",
+    "hash_password",
+    "verify_password",
+    "add_user",
+    "get_user",
+    "get_unapproved_users",
+    "approve_user",
+    "update_session_token",
+    "initialize_session_state",
+    "login_user",
+    "logout_user",
     "check_concurrent_login",
 
     # Neo4j & Data
