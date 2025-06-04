@@ -436,26 +436,35 @@ def build_styled_dataframe(df_long: pd.DataFrame, metrics_to_display: list) -> S
     return styler
     
 @st.cache_data(ttl="1h", show_spinner="Loading vector data for year...")
-def load_vectors_for_similarity(_driver, year: int, family: str = "cf_vec_", sectors: List[str]=None) -> Dict[str, np.ndarray]:
+def load_vectors_for_similarity(_driver, year: int, family: str = "cf_vec_", sectors: List[str]=None, target_sym: str=None):
     prop = f"{family}{year}"
     sector_filter = ""
-    if sectors:
-        sector_filter = "AND c.sector IN $sectors"
+    params = {}
+    # 1. Always fetch the target vector (even if not in sectors)
+    # 2. For other companies, filter by sector if needed
     query = f"""
     MATCH (c:Company)
-    WHERE c.{prop} IS NOT NULL AND c.ipoDate IS NOT NULL {sector_filter}
-    RETURN c.symbol AS sym, c.{prop} AS vec
+    WHERE c.{prop} IS NOT NULL AND c.ipoDate IS NOT NULL
+    RETURN c.symbol AS sym, c.{prop} AS vec, c.sector AS sector
     """
     try:
         with _driver.session(database="neo4j") as session:
-            params = {}
-            if sectors:
-                params["sectors"] = sectors
             results = session.run(query, **params)
-            return {r["sym"]: np.asarray(r["vec"], dtype=np.float32) for r in results}
+            all_vecs = {r["sym"]: np.asarray(r["vec"], dtype=np.float32) for r in results}
+            if sectors:
+                candidate_vecs = {sym: vec for sym, vec in all_vecs.items() if r["sector"] in sectors and sym != target_sym}
+            else:
+                candidate_vecs = {sym: vec for sym, vec in all_vecs.items() if sym != target_sym}
+            target_vector = all_vecs.get(target_sym)
+            return target_vector, candidate_vecs
     except Exception as e:
         st.error(f"Error loading vectors for {prop}: {e}")
-        return {}
+        return None, {}
+
+# Then in your aggregation function, use:
+target_vector, candidate_vectors = load_vectors_for_similarity(...)
+# And proceed as before.
+
 
 
 def calculate_similarity_scores(target_vector: np.ndarray, vectors: Dict[str, np.ndarray]) -> Dict[str, float]:
