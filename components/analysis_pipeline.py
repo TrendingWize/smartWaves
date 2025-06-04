@@ -1,5 +1,4 @@
-# analysis_pipeline.py (Refactored)
-
+# analysis_pipeline.py (refactored, robust, and clean)
 from __future__ import annotations
 import datetime
 import json
@@ -7,67 +6,95 @@ import logging
 import os
 import time
 from dataclasses import dataclass
+from datetime import datetime as dt_class
 from typing import Any, Dict, Optional
 
-import streamlit as st
-from openai import OpenAI, APIError, APIConnectionError, RateLimitError, BadRequestError
-from .financial_data_module import FinancialDataModule, Config
+import pandas as pd
+
+try:
+    import streamlit as st
+except ImportError:
+    st = None  # If not running in Streamlit
+
+try:
+    from openai import OpenAI, APIError, APIConnectionError, RateLimitError, BadRequestError
+except ImportError:
+    OpenAI = None
 
 try:
     from neo4j import GraphDatabase, Driver, unit_of_work
 except ImportError:
-    GraphDatabase = None; Driver = None; unit_of_work = None
-    print("WARNING: neo4j driver not installed.")
+    GraphDatabase = None
+    Driver = None
+    unit_of_work = lambda *a, **k: (lambda f: f)
 
-# --------------------------------------------------------------------------- #
-# Logging & Constants
-# --------------------------------------------------------------------------- #
+from .financial_data_module import FinancialDataModule, Config
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)s [%(name)s:%(lineno)d] %(message)s",
 )
 logger = logging.getLogger("annual")
 
-# --------------------------------------------------------------------------- #
-# Helper: get or create all resource singletons in Streamlit session state
-# --------------------------------------------------------------------------- #
+# ---------------------------------------------------------------------------- #
+# Resource/context loader (A, C)
+# ---------------------------------------------------------------------------- #
 def get_analysis_resources():
-    if not hasattr(st.session_state, "APP_CONFIG"):
-        st.session_state.APP_CONFIG = Config(
-            fmp_key=st.secrets.get("FMP_API_KEY") or os.getenv("FMP_API_KEY", ""),
-            openai_key=st.secrets.get("OPENAI_API_KEY") or os.getenv("OPENAI_API_KEY", ""),
-            openai_model=st.secrets.get("OPENAI_MODEL") or os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
-            neo4j_uri=st.secrets.get("NEO4J_URI") or os.getenv("NEO4J_URI"),
-            neo4j_user=st.secrets.get("NEO4J_USER") or os.getenv("NEO4J_USER"),
-            neo4j_password=st.secrets.get("NEO4J_PASSWORD") or os.getenv("NEO4J_PASSWORD"),
+    # If running in Streamlit, keep resources per session; else local vars.
+    config = None
+    fdm = None
+    openai_client = None
+    neo4j_driver = None
+
+    # Streamlit or script
+    if st is not None and hasattr(st, "session_state"):
+        sess = st.session_state
+        if not hasattr(sess, "APP_CONFIG"):
+            sess.APP_CONFIG = Config(
+                fmp_key=st.secrets.get("FMP_API_KEY", "") or os.getenv("FMP_API_KEY", ""),
+                openai_key=st.secrets.get("OPENAI_API_KEY", "") or os.getenv("OPENAI_API_KEY", ""),
+                openai_model=st.secrets.get("OPENAI_MODEL", "") or os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
+                neo4j_uri=st.secrets.get("NEO4J_URI") or os.getenv("NEO4J_URI", ""),
+                neo4j_user=st.secrets.get("NEO4J_USER") or os.getenv("NEO4J_USER", ""),
+                neo4j_password=st.secrets.get("NEO4J_PASSWORD") or os.getenv("NEO4J_PASSWORD", ""),
+            )
+        config = sess.APP_CONFIG
+
+        if not hasattr(sess, "FDM_MODULE_INSTANCE"):
+            sess.FDM_MODULE_INSTANCE = FinancialDataModule(config)
+        fdm = sess.FDM_MODULE_INSTANCE
+
+        if not hasattr(sess, "OPENAI_CLIENT_INSTANCE") and config.openai_key and OpenAI:
+            sess.OPENAI_CLIENT_INSTANCE = OpenAI(api_key=config.openai_key)
+        openai_client = getattr(sess, "OPENAI_CLIENT_INSTANCE", None)
+
+        if not hasattr(sess, "NEO4J_DRIVER_INSTANCE") and config.neo4j_uri and GraphDatabase:
+            sess.NEO4J_DRIVER_INSTANCE = GraphDatabase.driver(
+                config.neo4j_uri, auth=(config.neo4j_user, config.neo4j_password)
+            )
+        neo4j_driver = getattr(sess, "NEO4J_DRIVER_INSTANCE", None)
+    else:
+        # Non-Streamlit/script context: local scope
+        config = Config(
+            fmp_key=os.getenv("FMP_API_KEY", ""),
+            openai_key=os.getenv("OPENAI_API_KEY", ""),
+            openai_model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
+            neo4j_uri=os.getenv("NEO4J_URI", ""),
+            neo4j_user=os.getenv("NEO4J_USER", ""),
+            neo4j_password=os.getenv("NEO4J_PASSWORD", ""),
         )
-    config = st.session_state.APP_CONFIG
-
-    if not hasattr(st.session_state, "FDM_MODULE_INSTANCE"):
-        st.session_state.FDM_MODULE_INSTANCE = FinancialDataModule(config)
-
-    if not hasattr(st.session_state, "OPENAI_CLIENT_INSTANCE") and config.openai_key:
-        st.session_state.OPENAI_CLIENT_INSTANCE = OpenAI(api_key=config.openai_key)
-
-    if not hasattr(st.session_state, "NEO4J_DRIVER_INSTANCE") and config.neo4j_uri and GraphDatabase:
-        st.session_state.NEO4J_DRIVER_INSTANCE = GraphDatabase.driver(
-            config.neo4j_uri, auth=(config.neo4j_user, config.neo4j_password)
+        fdm = FinancialDataModule(config)
+        openai_client = OpenAI(api_key=config.openai_key) if config.openai_key and OpenAI else None
+        neo4j_driver = (
+            GraphDatabase.driver(config.neo4j_uri, auth=(config.neo4j_user, config.neo4j_password))
+            if config.neo4j_uri and GraphDatabase
+            else None
         )
-        try:
-            st.session_state.NEO4J_DRIVER_INSTANCE.verify_connectivity()
-        except Exception as e:
-            logger.error(f"Neo4j connectivity failed: {e}")
+    return config, fdm, openai_client, neo4j_driver
 
-    return (
-        st.session_state.APP_CONFIG,
-        st.session_state.FDM_MODULE_INSTANCE,
-        st.session_state.OPENAI_CLIENT_INSTANCE,
-        st.session_state.NEO4J_DRIVER_INSTANCE
-    )
-
-# --------------------------------------------------------------------------- #
-# Prompt Instruction Loader with Error Handling
-# --------------------------------------------------------------------------- #
+# ---------------------------------------------------------------------------- #
+# Prompt loader (E)
+# ---------------------------------------------------------------------------- #
 def load_prompt_instruction(md_path: str) -> str:
     try:
         with open(md_path, "r", encoding="utf-8") as f:
@@ -76,9 +103,39 @@ def load_prompt_instruction(md_path: str) -> str:
         logger.error(f"Prompt instruction file not found: {md_path}")
         return "INSTRUCTIONS FILE NOT FOUND. Please check configuration."
 
-# --------------------------------------------------------------------------- #
-# Neo4j: Get & Save Analysis Report
-# --------------------------------------------------------------------------- #
+# ---------------------------------------------------------------------------- #
+# Main pipeline entry point
+# ---------------------------------------------------------------------------- #
+def generate_ai_report(
+    symbol_to_process: str,
+    report_period: str,
+    period_back_offset: int = 0
+) -> Optional[Dict[str, Any]]:
+    config, fdm, openai_client, neo4j_driver = get_analysis_resources()
+
+    # Load prompt
+    prompt_path = os.path.join(os.path.dirname(__file__), "annual_analysis_instructions.md")
+    instructions = load_prompt_instruction(prompt_path)
+
+    try:
+        report_data = process_symbol_logic(
+            symbol_to_process=symbol_to_process,
+            current_period_back_val=period_back_offset,
+            report_period=report_period,
+            fdm_module_instance=fdm,
+            openai_client_instance=openai_client,
+            neo4j_driver_instance=neo4j_driver,
+            app_config=config,
+            prompt_instructions=instructions,
+        )
+        return report_data
+    except Exception as e:
+        logger.exception(f"Exception in generate_ai_report: {e}")
+        return {"status": "error_exception", "symbol": symbol_to_process, "message": str(e)}
+
+# ---------------------------------------------------------------------------- #
+# Neo4j UOW for fetch/save
+# ---------------------------------------------------------------------------- #
 @unit_of_work(timeout=10)
 def get_analysis_from_neo4j(tx, symbol_param: str, filling_date_str: str) -> Optional[Dict[str, Any]]:
     query = (
@@ -90,11 +147,15 @@ def get_analysis_from_neo4j(tx, symbol_param: str, filling_date_str: str) -> Opt
     if record and record["ar"]:
         report_data = dict(record["ar"])
         if 'metadata' in report_data and isinstance(report_data['metadata'], str):
-            try: report_data['metadata'] = json.loads(report_data['metadata'])
-            except json.JSONDecodeError: pass
+            try:
+                report_data['metadata'] = json.loads(report_data['metadata'])
+            except json.JSONDecodeError:
+                pass
         if 'analysis' in report_data and isinstance(report_data['analysis'], str):
-            try: report_data['analysis'] = json.loads(report_data['analysis'])
-            except json.JSONDecodeError: pass
+            try:
+                report_data['analysis'] = json.loads(report_data['analysis'])
+            except json.JSONDecodeError:
+                pass
         if 'metadata' in report_data and isinstance(report_data['metadata'], dict):
             for key, val in report_data['metadata'].items():
                 if hasattr(val, 'iso_format'):
@@ -108,7 +169,7 @@ def get_analysis_from_neo4j(tx, symbol_param: str, filling_date_str: str) -> Opt
 def save_analysis_to_neo4j(tx, symbol_param: str, analysis_report_data: Dict[str, Any]):
     metadata_block = analysis_report_data.get("metadata", {})
     analysis_block = analysis_report_data.get("analysis", {})
-    filling_date_str = metadata_block.get("fillingDate") 
+    filling_date_str = metadata_block.get("fillingDate")
 
     if not filling_date_str:
         logger.error(f"Cannot save analysis for {symbol_param} to Neo4j: missing fillingDate in metadata.")
@@ -173,49 +234,28 @@ def save_analysis_to_neo4j(tx, symbol_param: str, analysis_report_data: Dict[str
         "RETURN ar"
     )
     tx.run(query_ar, **params_for_ar)
-    logger.info(f"Analysis for {symbol_param} (fillingDate: {filling_date_str}) saved to Neo4j.")
+    logger.info(f"Analysis for {symbol_param} (fillingDate: {filling_date_str}) saved to Neo4j (queued in transaction).")
+    return True
 
-# --------------------------------------------------------------------------- #
-# Main: AI Analysis Generation Function
-# --------------------------------------------------------------------------- #
-def generate_ai_report(
-    symbol_to_process: str,
-    report_period: str,
-    period_back_offset: int = 0
-) -> Optional[Dict[str, Any]]:
-    config, fdm, openai_client, neo4j_driver = get_analysis_resources()
-    PROMPT_PATH = os.path.join(os.path.dirname(__file__), "annual_analysis_instructions.md")
-    instructions = load_prompt_instruction(PROMPT_PATH)
-    return process_symbol_logic(
-        symbol_to_process=symbol_to_process,
-        current_period_back_val=period_back_offset,
-        report_period=report_period,
-        fdm_module_instance=fdm,
-        openai_client_instance=openai_client,
-        neo4j_driver_instance=neo4j_driver,
-        app_config=config,
-        prompt_instructions=instructions,
-        prompt_path=PROMPT_PATH
-    )
-
-# --------------------------------------------------------------------------- #
-# Core Symbol Processing/Analysis
-# --------------------------------------------------------------------------- #
+# ---------------------------------------------------------------------------- #
+# Core Analysis Logic (now fully parameterized, no globals)
+# ---------------------------------------------------------------------------- #
 def process_symbol_logic(
     symbol_to_process: str,
     current_period_back_val: int,
     report_period: str,
     fdm_module_instance: FinancialDataModule,
     openai_client_instance: Optional[OpenAI],
-    neo4j_driver_instance: Optional[Any],
+    neo4j_driver_instance: Optional[Driver],
     app_config: Config,
     prompt_instructions: str,
-    prompt_path: str
 ):
     start_ts = time.time()
-    logger.info(f"Starting analysis for symbol: {symbol_to_process}, period: {report_period}, period_back: {current_period_back_val}")
+    logger.info(f"Starting analysis for symbol: {symbol_to_process}, period_back: {current_period_back_val}")
 
     prospective_fmp_filling_date_str = None
+
+    # STEP 1: Determine prospective_fmp_filling_date_str
     try:
         target_statements = fdm_module_instance.get_financial_statements(
             symbol=symbol_to_process, statement="income-statement",
@@ -224,71 +264,91 @@ def process_symbol_logic(
         if target_statements and len(target_statements) > current_period_back_val:
             target_statement_for_date = target_statements[current_period_back_val]
             date_val = target_statement_for_date.get("fillingDate") or target_statement_for_date.get("date")
-            if date_val: prospective_fmp_filling_date_str = date_val[:10]
+            if date_val:
+                prospective_fmp_filling_date_str = date_val[:10]
+        if prospective_fmp_filling_date_str:
+            logger.info(f"Prospective FMP filling date for {symbol_to_process} is {prospective_fmp_filling_date_str}")
+        else:
+            logger.warning(f"Could not determine prospective FMP filling date for {symbol_to_process}.")
     except Exception as e_date_fetch:
-        logger.error(f"Error during FMP call for filling date for {symbol_to_process}: {e_date_fetch}.")
+        logger.error(f"Error during initial FMP call for filling date for {symbol_to_process}: {e_date_fetch}.")
         prospective_fmp_filling_date_str = None
 
-    # Neo4j cache check
-    if neo4j_driver_instance and prospective_fmp_filling_date_str:
-        def transform_and_check_analysis_report(record_cursor_ar):
-            single_record_ar = record_cursor_ar.single()
-            if not single_record_ar or not single_record_ar["ar"]: return None
-            report_node_data = dict(single_record_ar["ar"])
-            metadata_dict = {}
-            if 'metadata_json' in report_node_data and isinstance(report_node_data['metadata_json'], str):
-                try: metadata_dict = json.loads(report_node_data['metadata_json'])
-                except json.JSONDecodeError: logger.error(f"Cache: Error decoding metadata_json for {symbol_to_process}."); return None
-            analysis_as_of_date_str = metadata_dict.get("as_of_date")
-            report_node_filling_date_obj = report_node_data.get("fillingDate")
-            report_node_filling_date_str = report_node_filling_date_obj.iso_format()[:10] if report_node_filling_date_obj and hasattr(report_node_filling_date_obj, 'iso_format') else None
-            if prospective_fmp_filling_date_str and analysis_as_of_date_str and prospective_fmp_filling_date_str == analysis_as_of_date_str:
-                full_cached_report = {
-                    "metadata": metadata_dict,
-                    "analysis": {},
-                    "prompt_tokens": report_node_data.get("prompt_tokens"),
-                    "completion_tokens": report_node_data.get("completion_tokens"),
-                    "total_tokens": report_node_data.get("total_tokens"),
-                    "analysis_generated_at": report_node_data.get("analysis_generated_at").iso_format() if hasattr(report_node_data.get('analysis_generated_at'), 'iso_format') else None,
-                    "model_used": report_node_data.get("model_used"),
-                    "symbol_processing_duration_total": report_node_data.get("symbol_processing_duration"),
-                    "fmp_data_for_analysis": {}
-                }
-                if 'analysis_json' in report_node_data and isinstance(report_node_data['analysis_json'], str):
-                    try: full_cached_report['analysis'] = json.loads(report_node_data['analysis_json'])
-                    except json.JSONDecodeError: logger.error(f"Cache: Error decoding analysis_json for {symbol_to_process}.")
-                return full_cached_report
+    # STEP 2: Check Neo4j cache
+    if neo4j_driver_instance:
+def transform_and_check_analysis_report(record_cursor_ar, prospective_fmp_filling_date_str, symbol_to_process):
+    """
+    Neo4j transformer for cache check: returns a full cached report dict if the node matches the expected period.
+    """
+    import json
+    logger = logging.getLogger("annual")
+
+    single_record_ar = record_cursor_ar.single()
+    if not single_record_ar or not single_record_ar.get("ar"):
+        return None
+
+    report_node_data = dict(single_record_ar["ar"])
+    metadata_dict = {}
+    analysis_dict = {}
+
+    # Parse metadata JSON string
+    if 'metadata_json' in report_node_data and isinstance(report_node_data['metadata_json'], str):
+        try:
+            metadata_dict = json.loads(report_node_data['metadata_json'])
+        except json.JSONDecodeError as e:
+            logger.error(f"Cache: Error decoding metadata_json for {symbol_to_process}: {e}")
             return None
+    else:
+        logger.warning(f"Cache: Missing or invalid metadata_json for {symbol_to_process}.")
+        return None
 
-        cypher_for_cache_check = "MATCH (ar:AnalysisReport {symbol: $symbol_param, fillingDate: date($date_param)}) RETURN ar LIMIT 1"
-        params_for_cache_check = {"symbol_param": symbol_to_process, "date_param": prospective_fmp_filling_date_str}
-        existing_analysis_report = neo4j_driver_instance.execute_query(
-            query_=cypher_for_cache_check, database_=None, 
-            result_transformer_=transform_and_check_analysis_report, **params_for_cache_check
-        )
-        if existing_analysis_report:
-            logger.info(f"Using cached analysis report for {symbol_to_process}.")
-            return existing_analysis_report
+    # Parse analysis JSON string
+    if 'analysis_json' in report_node_data and isinstance(report_node_data['analysis_json'], str):
+        try:
+            analysis_dict = json.loads(report_node_data['analysis_json'])
+        except json.JSONDecodeError as e:
+            logger.error(f"Cache: Error decoding analysis_json for {symbol_to_process}: {e}")
+            analysis_dict = {}
 
-    logger.info(f"Proceeding with FMP data fetch and OpenAI analysis for {symbol_to_process} (Prospective FMP Date: {prospective_fmp_filling_date_str or 'Unknown'}).")
+    analysis_as_of_date_str = metadata_dict.get("as_of_date")
+    report_node_filling_date_obj = report_node_data.get("fillingDate")
+    report_node_filling_date_str = (
+        report_node_filling_date_obj.iso_format()[:10]
+        if report_node_filling_date_obj and hasattr(report_node_filling_date_obj, 'iso_format')
+        else None
+    )
 
-    fmp_company_data = None
-    actual_fmp_filling_date_str = None
-    try:
-        fmp_company_data = fdm_module_instance.execute_all(
-            symbol_param=symbol_to_process,
-            current_period_back=current_period_back_val,
-            current_period_type=report_period
+    logger.info(
+        f"Cache Candidate for {symbol_to_process}: Node.fillingDate={report_node_filling_date_str}, "
+        f"Metadata.as_of_date={analysis_as_of_date_str}"
+    )
+
+    # Core comparison: Prospective FMP fillingDate vs. cached analysis's as_of_date
+    if prospective_fmp_filling_date_str and analysis_as_of_date_str and \
+       prospective_fmp_filling_date_str == analysis_as_of_date_str:
+        logger.info(
+            f"CACHE HIT: Prospective FMP Date ({prospective_fmp_filling_date_str}) matches Cached Analysis As-Of-Date ({analysis_as_of_date_str})."
         )
-        date_val_pkg = (
-            fmp_company_data.get("metadata_package", {}).get("fmp_filling_date") or
-            (fmp_company_data["income_statement"][0].get("fillingDate") if fmp_company_data.get("income_statement") and fmp_company_data["income_statement"][0] else None) or
-            (fmp_company_data["income_statement"][0].get("date") if fmp_company_data.get("income_statement") and fmp_company_data["income_statement"][0] else None)
-        )
-        if not date_val_pkg:
-            logger.error(f"No FMP filling date in package for {symbol_to_process}.")
-            return {"status": "fmp_error_no_date_full_pkg", "symbol": symbol_to_process, "fmp_data": fmp_company_data or {}}
-        actual_fmp_filling_date_str = date_val_pkg[:10]
+        # Return the reconstructed cached report
+        return {
+            "metadata": metadata_dict,
+            "analysis": analysis_dict,
+            "prompt_tokens": report_node_data.get("prompt_tokens"),
+            "completion_tokens": report_node_data.get("completion_tokens"),
+            "total_tokens": report_node_data.get("total_tokens"),
+            "analysis_generated_at": (
+                report_node_data.get("analysis_generated_at").iso_format()
+                if hasattr(report_node_data.get("analysis_generated_at"), "iso_format")
+                else report_node_data.get("analysis_generated_at")
+            ),
+            "model_used": report_node_data.get("model_used"),
+            "symbol_processing_duration_total": report_node_data.get("symbol_processing_duration"),
+            "fmp_data_for_analysis": {},  # Not loaded here; load if you store a snapshot
+        }
+
+    logger.info(f"CACHE MISS or Date Mismatch for {symbol_to_process}.")
+    return None
+
 
         if not openai_client_instance:
             logger.warning(f"OpenAI client not available. Skipping OpenAI for {symbol_to_process}.")
@@ -303,7 +363,7 @@ def process_symbol_logic(
 
         try:
             response = openai_client_instance.chat.completions.create(
-                model=app_config.openai_model,
+                model=getattr(app_config, 'openai_model', 'gpt-4o-mini'),
                 messages=[
                     {"role": "system", "content": prompt_instructions},
                     {"role": "user", "content": f"{report_period.capitalize()} Company financial information (JSON):\n{fmp_company_data_string}\n\nQuestion: {question}"}
@@ -321,26 +381,69 @@ def process_symbol_logic(
                     logger.error(f"OpenAI: Invalid JSON for {symbol_to_process}: {jde}. Resp: {message_content[:200]}")
                     generated_analysis_json = {"error_openai_json": str(jde), "raw_response": message_content}
             else:
-                logger.error(f"OpenAI: Empty response for {symbol_to_process}. Reason: {response.choices[0].finish_reason}")
+                logger.error(f"OpenAI: Empty response for {symbol_to_process}. Finish: {response.choices[0].finish_reason}")
                 generated_analysis_json = {"error_openai_empty": f"Empty. Reason: {response.choices[0].finish_reason}"}
+
         except (APIError, APIConnectionError, RateLimitError, BadRequestError) as e_api:
-            logger.error(f"OpenAI API error for {symbol_to_process}: {e_api}")
+            logger.error(f"OpenAI API error for {symbol_to_process}: {e_api}", exc_info=False)
             generated_analysis_json = {"error_openai_api": str(e_api)}
         except Exception as e_openai_proc:
-            logger.exception(f"OpenAI processing error for {symbol_to_process}: {e_openai_proc}")
+            logger.error(f"OpenAI processing error for {symbol_to_process}: {e_openai_proc}", exc_info=True)
             generated_analysis_json = {"error_openai_processing": str(e_openai_proc)}
 
         if generated_analysis_json is None:
             generated_analysis_json = {"error_openai_unknown": "Analysis was not populated after call attempt."}
 
+        # Add metadata to generated_analysis_json
         if isinstance(generated_analysis_json, dict):
             if not any(k.startswith("error_") for k in generated_analysis_json) and response_obj_for_metadata:
-                generated_analysis_json['prompt_tokens'] = response_obj_for_metadata.usage.prompt_tokens
-                generated_analysis_json['completion_tokens'] = response_obj_for_metadata.usage.completion_tokens
-                generated_analysis_json['total_tokens'] = response_obj_for_metadata.usage.total_tokens
-                generated_analysis_json['model_used'] = response_obj_for_metadata.model
+                generated_analysis_json['prompt_tokens'] = getattr(response_obj_for_metadata.usage, "prompt_tokens", None)
+                generated_analysis_json['completion_tokens'] = getattr(response_obj_for_metadata.usage, "completion_tokens", None)
+                generated_analysis_json['total_tokens'] = getattr(response_obj_for_metadata.usage, "total_tokens", None)
+                generated_analysis_json['model_used'] = getattr(response_obj_for_metadata, "model", None)
 
-            generated_analysis_json['analysis_generated_at'] = datetime.datetime.now(datetime.timezone.utc).isoformat()
+            generated_analysis_json['analysis_generated_at'] = dt_class.now(datetime.timezone.utc).isoformat()
             generated_analysis_json['symbol_processing_duration_total'] = time.time() - start_ts
 
-            current_meta = generated_analysis_json.get('metadata',)
+            current_meta = generated_analysis_json.get('metadata', {})
+            if not isinstance(current_meta, dict):
+                current_meta = {}
+            current_meta['ticker'] = symbol_to_process
+            current_meta['fillingDate'] = actual_fmp_filling_date_str
+            current_meta['as_of_date'] = actual_fmp_filling_date_str
+            current_meta['calendarYear'] = fmp_company_data.get("metadata_package", {}).get("fmp_calendar_year")
+            generated_analysis_json['metadata'] = current_meta
+            generated_analysis_json['fmp_data_for_analysis'] = fmp_company_data
+
+        # STEP 5: Save new analysis to Neo4j (only if no errors from OpenAI)
+        if (
+            neo4j_driver_instance
+            and isinstance(generated_analysis_json, dict)
+            and not any(k.startswith("error_") for k in generated_analysis_json)
+        ):
+            try:
+                with neo4j_driver_instance.session(database_=None) as session:
+                    session.execute_write(
+                        save_analysis_to_neo4j,
+                        symbol_param=symbol_to_process,
+                        analysis_report_data=generated_analysis_json
+                    )
+            except Exception as e_neo_save:
+                logger.error(f"Error saving NEW analysis to Neo4j for {symbol_to_process}: {e_neo_save}", exc_info=True)
+                if isinstance(generated_analysis_json, dict):
+                    generated_analysis_json['error_neo4j_save'] = str(e_neo_save)
+
+        if isinstance(generated_analysis_json, dict) and not any(k.startswith("error_") for k in generated_analysis_json):
+            logger.info(f"SUCCESS (new analysis by OpenAI): {symbol_to_process} processed in {time.time() - start_ts:.2f} seconds.")
+        else:
+            logger.warning(f"ISSUES processing {symbol_to_process}. Final result object: {str(generated_analysis_json)[:200]}...")
+        return generated_analysis_json
+
+    except RuntimeError as e_runtime:
+        logger.error(f"RUNTIME ERROR for {symbol_to_process} during full FMP fetch: {e_runtime}", exc_info=True)
+        return {"status": "runtime_error_fmp_full", "symbol": symbol_to_process, "error": str(e_runtime), "fmp_data_on_error": fmp_company_data}
+    except Exception as e_main:
+        logger.error(f"OVERALL FAILED for {symbol_to_process} in main block: {e_main}", exc_info=True)
+        return {"status": "overall_failure_main_process", "symbol": symbol_to_process, "error": str(e_main)}
+
+# ---- END OF FILE ----
