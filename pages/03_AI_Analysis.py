@@ -1,11 +1,12 @@
 # --- pages/03_AI_Analysis.py ---
 import streamlit as st
+st.set_page_config(page_title="AI Analysis - Smart Waves", layout="wide")
+
 from components.analysis_pipeline import generate_ai_report
 from utils.user_auth import display_ai_analysis_dashboard
 from styles import load_global_css
 from components.financial_data_module import FinancialDataModule, Config
 
-st.set_page_config(page_title="AI Analysis - Smart Waves", layout="wide")
 load_global_css()
 
 st.title("🧠 AI-Powered Financial Analysis")
