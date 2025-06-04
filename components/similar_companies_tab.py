@@ -20,17 +20,12 @@ DEFAULT_DECAY = 0.7  # λ for recency-weighted mean
 def fetch_market_cap_classes(driver=None):
     if not driver:
         driver = get_neo4j_driver()
-    where_clauses = [f"c.{prop} IS NOT NULL", "c.ipoDate IS NOT NULL"]
-    if sectors:
-        where_clauses.append("c.sector IN $sectors")
-    if cap_classes:
-        where_clauses.append("c.marketCapClass IN $cap_classes")
-        where_str = " AND ".join(where_clauses)
-        query = (
-        f"MATCH (c:Company)\n"
-        f"WHERE {where_str}\n"
-        f"RETURN c.symbol AS sym, c.{prop} AS vec, c.sector AS sector, c.marketCapClass AS cap_class"
-        )
+    query = """
+    MATCH (c:Company)
+    WHERE c.marketCapClass IS NOT NULL
+    RETURN DISTINCT c.marketCapClass AS cap_class
+    ORDER BY cap_class
+    """
     try:
         with driver.session() as session:
             result = session.run(query)
@@ -79,7 +74,6 @@ def load_vectors_for_similarity(
     except Exception as e:
         st.error(f"Error loading vectors for {prop}: {e}")
         return None, {}
-
 
 # --- Cosine Similarity ---
 def calculate_similarity_scores(target_vector: np.ndarray, vectors: Dict[str, np.ndarray]) -> Dict[str, float]:
