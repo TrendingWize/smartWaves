@@ -7,7 +7,8 @@ from utils.utils_helpers import (                   # ← pull everything from u
     calculate_delta,
     _arrow,
     R_display_metric_card,
-    fetch_income_statement_data
+    fetch_income_statement_data,
+    get_neo4j_driver
 )
 # --- Main Tab Function ---
 def income_statement_tab_content(selected_symbol_from_app):
