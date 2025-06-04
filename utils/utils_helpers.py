@@ -490,6 +490,7 @@ def get_nearest_aggregate_similarities(_driver,
                                        sectors=None,
                                        weight_scheme=None,
                                        normalize=True,
+                                       cap_classes=cap_classes
                                        k: int = 10) -> List[Tuple[str, float]]:
     if not _driver:
         return []
