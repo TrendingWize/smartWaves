@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import streamlit as st
 
-from utils import (
+from utils.user_auth import (
     initialize_session_state,
     check_concurrent_login,
     logout_user,
