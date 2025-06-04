@@ -6,12 +6,11 @@ Uses the shared tab renderer from components.ai_analysis.
 from __future__ import annotations
 
 import streamlit as st
-
+from styles import load_global_css
 from utils.user_auth import (
     initialize_session_state,
     check_concurrent_login,
     logout_user,
-    load_global_css,  # centralised CSS injector
 )
 from components.sec_filing_analysis import sec_filing_analysis_tab_content
 
