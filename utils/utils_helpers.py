@@ -527,7 +527,8 @@ def get_nearest_aggregate_similarities(_driver,
 def fetch_financial_details_for_companies(
     _driver, 
     company_symbols: List[str], 
-    year: int = None) -> Dict[str, Dict]:
+    year: int = None,
+sector=None) -> Dict[str, Dict]:
 
 
 
