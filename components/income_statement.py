@@ -3,7 +3,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np # Import numpy for np.nan if you prefer that over None
 import plotly.express as px
-from utils import (                   # ← pull everything from utils.py instead
+from utils.user_auth import (                   # ← pull everything from utils.py instead
     get_neo4j_driver,
     format_value,
     calculate_delta,
