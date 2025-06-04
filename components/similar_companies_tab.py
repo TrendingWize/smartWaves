@@ -1,39 +1,40 @@
+# components/similar_companies_tab.py
+
 import streamlit as st
-import pandas as pd
 import numpy as np
 import inspect
 from datetime import datetime
 from typing import Dict, Any, List, Tuple
-
 from utils import (
     get_neo4j_driver,
     get_nearest_aggregate_similarities,
     fetch_financial_details_for_companies,
     format_value,
-    fetch_sector_list,  # New utility function
-    fetch_company_preview,  # New utility function
+    fetch_sector_list,
+    fetch_company_preview
 )
-
-# --------------------------------------------------------------------------------------
-# Streamlit tab builder – "Similar Companies" with enhanced features
-# --------------------------------------------------------------------------------------
 
 DEFAULT_DECAY = 0.7  # λ for recency-weighted mean
 
 def similar_companies_tab_content() -> None:
-    """Render enhanced 'Find Similar Companies' tab with:
-    - Year range selection
-    - Sector/industry filtering
-    - Combined embeddings option
-    - Visual similarity indicators
-    - Metric customization
-    - Company previews
-    """
-    st.title("🔍 Advanced Company Similarity Finder")
+    """Render enhanced 'Find Similar Companies' tab"""
+    st.title("🔍 Fundamental Similarity Analysis")
     st.markdown("""
     Discover fundamentally similar companies using financial statement embeddings.
     *Features:* Custom time ranges, sector filters, metric selection & visual comparisons.
     """)
+    
+    # Initialize driver early for sector list
+    neo_driver = get_neo4j_driver()
+    sectors = []
+    try:
+        sectors = fetch_sector_list(neo_driver)
+    except Exception as e:
+        st.error(f"Couldn't fetch sector list: {str(e)}")
+        sectors = ["Technology", "Healthcare", "Financial"]
+    finally:
+        if hasattr(neo_driver, "close"):
+            neo_driver.close()
 
     # ---------- User Inputs Section ----------
     with st.expander("🔧 Search Parameters", expanded=True):
@@ -52,12 +53,18 @@ def similar_companies_tab_content() -> None:
             )
             # Company preview
             if target_symbol:
-                with st.spinner("Fetching company info..."):
-                    preview = fetch_company_preview(target_symbol)
-                if preview:
-                    st.caption(f"**{preview['companyName']}** | {preview['sector']} | {preview['industry']}")
-                else:
-                    st.warning("Symbol not found in database")
+                preview_driver = get_neo4j_driver()
+                try:
+                    preview = fetch_company_preview(target_symbol, preview_driver)
+                    if preview:
+                        st.caption(f"**{preview['companyName']}** | {preview.get('sector', 'N/A')} | {preview.get('industry', 'N/A')}")
+                    else:
+                        st.warning("Symbol not found in database")
+                except Exception:
+                    st.warning("Couldn't fetch company details")
+                finally:
+                    if hasattr(preview_driver, "close"):
+                        preview_driver.close()
 
         # Embedding family selection
         embedding_family_options: Dict[str, str] = {
@@ -97,11 +104,10 @@ def similar_companies_tab_content() -> None:
         
         # Validate year range
         if start_year > end_year:
-            st.error("Start year must be before end year")
+            st.error("⚠️ Start year must be before end year")
             st.stop()
 
         # Sector filtering
-        sectors = fetch_sector_list()
         selected_sectors = st.multiselect(
             "Filter by Sector",
             options=sectors,
@@ -176,11 +182,11 @@ def similar_companies_tab_content() -> None:
     with search_col:
         if st.button("🚀 Find Similar Companies", use_container_width=True, type="primary"):
             if not target_symbol:
-                st.warning("Please enter a valid company symbol")
+                st.warning("⚠️ Please enter a valid company symbol")
                 st.stop()
                 
             if not selected_sectors:
-                st.warning("Please select at least one sector")
+                st.warning("⚠️ Please select at least one sector")
                 st.stop()
 
             # Reset previous results
@@ -190,10 +196,10 @@ def similar_companies_tab_content() -> None:
             # Connect & query
             neo_driver = get_neo4j_driver()
             if not neo_driver:
-                st.error("Database connection failed")
+                st.error("❌ Database connection failed")
                 st.stop()
 
-            with st.spinner(f"Analyzing {target_symbol} fundamentals..."):
+            with st.spinner(f"🔍 Analyzing {target_symbol} fundamentals..."):
                 try:
                     # Build query parameters
                     peer_kwargs: Dict[str, Any] = {
@@ -210,18 +216,22 @@ def similar_companies_tab_content() -> None:
                     
                     # Handle driver parameter
                     sig_peer = inspect.signature(get_nearest_aggregate_similarities)
-                    peer_kwargs['driver' if 'driver' in sig_peer.parameters else '_driver'] = neo_driver
+                    if 'driver' in sig_peer.parameters:
+                        peer_kwargs['driver'] = neo_driver
+                    elif '_driver' in sig_peer.parameters:
+                        peer_kwargs['_driver'] = neo_driver
                     
                     # Execute similarity search
                     peers = get_nearest_aggregate_similarities(**peer_kwargs)
                 except Exception as e:
-                    st.error(f"Search failed: {str(e)}")
+                    st.error(f"❌ Search failed: {str(e)}")
                     return
                 finally:
-                    neo_driver.close() if hasattr(neo_driver, "close") else None
+                    if hasattr(neo_driver, "close"):
+                        neo_driver.close()
 
             if not peers:
-                st.info("No similar companies found with current filters")
+                st.info("ℹ️ No similar companies found with current filters")
                 return
                 
             # Store results
@@ -233,16 +243,26 @@ def similar_companies_tab_content() -> None:
 
             # Fetch financial details
             symbols = [sym for sym, _ in peers[:k]]
-            with st.spinner("Compiling financial profiles..."):
+            with st.spinner("📊 Compiling financial profiles..."):
                 neo_driver = get_neo4j_driver()
                 try:
-                    details = fetch_financial_details_for_companies(
-                        symbols=symbols,
-                        year=end_year  # Get latest available data
-                    )
+                    sig_det = inspect.signature(fetch_financial_details_for_companies)
+                    if 'year' in sig_det.parameters:
+                        details = fetch_financial_details_for_companies(
+                            symbols=symbols,
+                            year=end_year  # Get latest available data
+                        )
+                    else:
+                        # Fallback to default implementation
+                        details = fetch_financial_details_for_companies(symbols=symbols)
+                    
                     st.session_state.similar_details = details or {}
+                except Exception as e:
+                    st.error(f"❌ Failed to fetch details: {str(e)}")
+                    st.session_state.similar_details = {}
                 finally:
-                    neo_driver.close() if hasattr(neo_driver, "close") else None
+                    if hasattr(neo_driver, "close"):
+                        neo_driver.close()
 
     # ---------- Results Display ----------
     if st.session_state.similar_companies:
@@ -255,7 +275,7 @@ def similar_companies_tab_content() -> None:
         
         peers = st.session_state.similar_companies
         details = st.session_state.similar_details
-        metric_year = st.session_state.metric_year
+        metric_year = st.session_state.metric_year or end_year
 
         # Generate metric display functions
         metric_handlers = {
@@ -270,10 +290,14 @@ def similar_companies_tab_content() -> None:
             "Operating Cash Flow": lambda m: m.get("operatingCashFlow"),
             "Free Cash Flow": lambda m: m.get("freeCashFlow"),
             "CapEx": lambda m: m.get("capitalExpenditure"),
-            "ROE": lambda m: (m.get("netIncome") / m.get("totalStockholdersEquity") 
-                            if m.get("totalStockholdersEquity") else None,
-            "Current Ratio": lambda m: (m.get("totalCurrentAssets") / m.get("totalCurrentLiabilities") 
-                                    if m.get("totalCurrentLiabilities") else None
+            "ROE": lambda m: (
+                (m.get("netIncome") / m.get("totalStockholdersEquity")) 
+                if m.get("totalStockholdersEquity") else None
+            ),
+            "Current Ratio": lambda m: (
+                (m.get("totalCurrentAssets") / m.get("totalCurrentLiabilities")) 
+                if m.get("totalCurrentLiabilities") else None
+            )
         }
         
         # Column layout - dynamic based on metric selection
@@ -288,4 +312,31 @@ def similar_companies_tab_content() -> None:
             
             with st.container():
                 # Header with similarity visual
-                header_col, score
+                header_col, score_col = st.columns([4, 1])
+                with header_col:
+                    st.markdown(f"**{idx}. [{sym}] {company_name}**")
+                    st.caption(f"{sector} › {industry}")
+                with score_col:
+                    st.metric("Similarity", f"{score:.0%}")
+                    st.progress(float(score), text=f"Cosine: {score:.4f}")
+                
+                # Metrics display
+                col_index = 0
+                for metric in selected_metrics:
+                    if col_index >= num_cols:
+                        col_index = 0
+                        cols = st.columns(num_cols)  # New row
+                    
+                    with cols[col_index]:
+                        if metric in metric_handlers:
+                            value = metric_handlers[metric](meta)
+                            st.metric(
+                                f"{metric} ({metric_year})", 
+                                format_value(value),
+                                help=f"Latest available data for {metric_year}"
+                            )
+                        else:
+                            st.metric(metric, "N/A")
+                    col_index += 1
+                
+                st.divider()
