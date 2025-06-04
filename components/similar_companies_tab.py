@@ -39,14 +39,6 @@ def fetch_market_cap_classes(driver=None):
         if driver and hasattr(driver, 'close'):
             driver.close()
 
-# In your UI:
-cap_classes = fetch_market_cap_classes(neo_driver)
-selected_cap_classes = st.multiselect(
-    "Filter by Market Cap Class",
-    options=cap_classes,
-    default=cap_classes,
-    key="cap_class_filter"
-)
 
 
 def similar_companies_tab_content() -> None:
@@ -375,3 +367,13 @@ def similar_companies_tab_content() -> None:
                     col_index += 1
                 
                 st.divider()
+
+
+# In your UI:
+cap_classes = fetch_market_cap_classes(neo_driver)
+selected_cap_classes = st.multiselect(
+    "Filter by Market Cap Class",
+    options=cap_classes,
+    default=cap_classes,
+    key="cap_class_filter"
+)
