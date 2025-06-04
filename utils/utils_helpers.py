@@ -531,62 +531,51 @@ def fetch_financial_details_for_companies(
     year: int = None,
     sectors: List[str] = None
 ) -> Dict[str, Dict]:
-
-
-
-
     query_option_b_no_apoc = """
     UNWIND $symbols AS sym_param
-MATCH (c:Company {symbol: sym_param})
-WHERE $sectors IS NULL OR c.sector IN $sectors
+    MATCH (c:Company {symbol: sym_param})
+    WHERE $sectors IS NULL OR c.sector IN $sectors
 
-// Income Statement
-OPTIONAL MATCH (c)-[:HAS_INCOME_STATEMENT]->(is_node:IncomeStatement)
-WHERE is_node.fillingDate IS NOT NULL AND ($year IS NULL OR is_node.calendarYear = $year)
-WITH c, sym_param, is_node ORDER BY is_node.fillingDate DESC
-WITH c, sym_param, COLLECT(is_node)[0] AS latest_is
+    OPTIONAL MATCH (c)-[:HAS_INCOME_STATEMENT]->(is_node:IncomeStatement)
+    WHERE is_node.fillingDate IS NOT NULL AND ($year IS NULL OR is_node.calendarYear = $year)
+    WITH c, sym_param, is_node ORDER BY is_node.fillingDate DESC
+    WITH c, sym_param, COLLECT(is_node)[0] AS latest_is
 
-// Balance Sheet
-OPTIONAL MATCH (c)-[:HAS_BALANCE_SHEET]->(bs_node:BalanceSheet)
-WHERE bs_node.fillingDate IS NOT NULL AND ($year IS NULL OR bs_node.calendarYear = $year)
-WITH c, sym_param, latest_is, bs_node ORDER BY bs_node.fillingDate DESC
-WITH c, sym_param, latest_is, COLLECT(bs_node)[0] AS latest_bs
+    OPTIONAL MATCH (c)-[:HAS_BALANCE_SHEET]->(bs_node:BalanceSheet)
+    WHERE bs_node.fillingDate IS NOT NULL AND ($year IS NULL OR bs_node.calendarYear = $year)
+    WITH c, sym_param, latest_is, bs_node ORDER BY bs_node.fillingDate DESC
+    WITH c, sym_param, latest_is, COLLECT(bs_node)[0] AS latest_bs
 
-// Cash Flow Statement
-OPTIONAL MATCH (c)-[:HAS_CASH_FLOW_STATEMENT]->(cf_node:CashFlowStatement)
-WHERE cf_node.fillingDate IS NOT NULL AND ($year IS NULL OR cf_node.calendarYear = $year)
-WITH c, sym_param, latest_is, latest_bs, cf_node ORDER BY cf_node.fillingDate DESC
-WITH c, sym_param, latest_is, latest_bs, COLLECT(cf_node)[0] AS latest_cf
+    OPTIONAL MATCH (c)-[:HAS_CASH_FLOW_STATEMENT]->(cf_node:CashFlowStatement)
+    WHERE cf_node.fillingDate IS NOT NULL AND ($year IS NULL OR cf_node.calendarYear = $year)
+    WITH c, sym_param, latest_is, latest_bs, cf_node ORDER BY cf_node.fillingDate DESC
+    WITH c, sym_param, latest_is, latest_bs, COLLECT(cf_node)[0] AS latest_cf
 
-RETURN sym_param AS symbol,
-       c.companyName AS companyName,
-       c.sector AS sector,
-       c.industry AS industry,
-       latest_is.revenue AS revenue,
-       latest_is.netIncome AS netIncome,
-       latest_is.operatingIncome AS operatingIncome,
-       latest_is.grossProfit AS grossProfit,
-       latest_bs.totalAssets AS totalAssets,
-       latest_bs.totalLiabilities AS totalLiabilities,
-       latest_bs.totalStockholdersEquity AS totalStockholdersEquity,
-       latest_bs.cashAndCashEquivalents AS cashAndCashEquivalents,
-       latest_cf.operatingCashFlow AS operatingCashFlow,
-       latest_cf.freeCashFlow AS freeCashFlow,
-       latest_cf.netChangeInCash AS netChangeInCash,
-       latest_cf.capitalExpenditure AS capitalExpenditure
+    RETURN sym_param AS symbol,
+           c.companyName AS companyName,
+           c.sector AS sector,
+           c.industry AS industry,
+           latest_is.revenue AS revenue,
+           latest_is.netIncome AS netIncome,
+           latest_is.operatingIncome AS operatingIncome,
+           latest_is.grossProfit AS grossProfit,
+           latest_bs.totalAssets AS totalAssets,
+           latest_bs.totalLiabilities AS totalLiabilities,
+           latest_bs.totalStockholdersEquity AS totalStockholdersEquity,
+           latest_bs.cashAndCashEquivalents AS cashAndCashEquivalents,
+           latest_cf.operatingCashFlow AS operatingCashFlow,
+           latest_cf.freeCashFlow AS freeCashFlow,
+           latest_cf.netChangeInCash AS netChangeInCash,
+           latest_cf.capitalExpenditure AS capitalExpenditure
     """
-    # The Option B with collect()[0] after ordering per group is also a common pattern.
-    # The key is that the ordering and selection (LIMIT 1 or collect()[0]) happens
-    # *for each company introduced by UNWIND*.
-
     details = {}
     try:
         with _driver.session(database="neo4j") as session:
-            # Use query_option_b_no_apoc if not using CALL subqueries
-            results = session.run(query_option_b_no_apoc, symbols=company_symbols) 
+            results = session.run(query_option_b_no_apoc, symbols=company_symbols, sectors=sectors, year=year)
             for record in results:
                 details[record["symbol"]] = record.data()
         return details
     except Exception as e:
         st.error(f"Error fetching financial details: {e}")
         return {}
+
