@@ -17,7 +17,7 @@ if not st.session_state.get('logged_in'): # Use .get for safety
     # Provide a way to navigate to login, e.g., if you have a multipage app structure
     # For example, if your login page is named "Login.py" or similar:
     if st.button("🔑 Go to Login"):
-        st.switch_page("Login.py") # Adjust if your login page has a different name/path
+        st.switch_page("pages/Login.py") # Adjust if your login page has a different name/path
     st.stop()
 
 # Concurrent login check
