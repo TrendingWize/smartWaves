@@ -256,7 +256,7 @@ def similar_companies_tab_content() -> None:
                         )
                     else:
                         # Fallback to default implementation
-                        details = fetch_financial_details_for_companies(symbols=symbols)
+                        details = fetch_financial_details_for_companies(company_symbols=symbols)
                     
                     st.session_state.similar_details = details or {}
                 except Exception as e:
