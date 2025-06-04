@@ -484,6 +484,7 @@ def get_nearest_aggregate_similarities(_driver,
                                        start_year: int = 2017, 
                                        end_year: int = 2023, 
                                        sectors=None,
+                                       weight_scheme=None,
                                        k: int = 10) -> List[Tuple[str, float]]:
     """Aggregates similarity scores over a range of years and returns top k similar companies."""
     if not _driver:
