@@ -237,7 +237,7 @@ def similar_companies_tab_content() -> None:
                             # Call imported fetch_financial_details_for_companies
                             # Removed 'sectors' from this call, to get details for any found peer
                             details = fetch_financial_details_for_companies(
-                                driver=neo_driver, # Pass main driver
+                                _driver=neo_driver, # Pass main driver
                                 company_symbols=symbols_for_details,
                                 year=end_year # Fetch details for the most recent year in range
                             )
