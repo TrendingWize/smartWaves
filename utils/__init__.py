@@ -10,8 +10,12 @@ from .utils_helpers import (
     R_display_metric_card,
     get_nearest_aggregate_similarities,
     fetch_financial_details_for_companies,
-    fetch_income_statement_data
+    fetch_income_statement_data,
+    fetch_sector_list,
+    fetch_company_preview
 )
+
+
 import streamlit as st
 import sqlite3
 import hashlib
