@@ -4,7 +4,6 @@ from streamlit_navigation_bar import st_navbar
 
 # Try importing more directly to see if the issue is with the __init__.py re-export
 from utils.user_auth import initialize_session_state, create_user_table, login_user, logout_user # check_concurrent_login
-from utils.user_auth import check_concurrent_login # Keep it separate if it helps isolate
 # --- Page Configuration ---
 st.set_page_config(
     page_title="Smart Waves",
