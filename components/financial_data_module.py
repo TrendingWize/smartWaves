@@ -26,7 +26,6 @@ def _redact(url: str, key: str) -> str:
 @dataclass(slots=True, frozen=True)
 class Config:
     fmp_key: str
-    fmp_key: str
     openai_key: str = ""
     neo4j_uri: str = ""
     neo4j_user: str = ""
