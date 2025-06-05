@@ -104,13 +104,11 @@ def save_composite_chart_plotly(df, tkr, frame, chart_type="candlestick"):
     if use_log:
         fig.update_yaxes(type="log", row=1, col=1, tickformat=".2f", dtick=0.30103)
 
-    if use_log:
-        fig.update_yaxes(
-        type="log",
-        row=1, col=1,
-        tickformat=".2f",          # Shows two decimal places
-        dtick=0.30103              # Log scale step: 10^0.30103 ≈ 2
-    )
+    min_price = df["close"].min()
+    max_price = df["close"].max()
+    price_ratio = max_price / min_price if min_price > 0 else 1
+    log_threshold = 1  # You can adjust this value as needed
+    use_log_scale = price_ratio > log_threshold or force_log
 
     if use_log:
         fig.update_yaxes(
@@ -120,13 +118,8 @@ def save_composite_chart_plotly(df, tkr, frame, chart_type="candlestick"):
         dtick=0.30103              # Log scale step: 10^0.30103 ≈ 2
     )
 
-    if use_log:
-        fig.update_yaxes(
-        type="log",
-        row=1, col=1,
-        tickformat=".2f",          # Shows two decimal places
-        dtick=0.10103              # Log scale step: 10^0.30103 ≈ 2
-    )
+
+
 
     return fig
 
