@@ -5,11 +5,13 @@ import json, textwrap, datetime as dt, re
 from pathlib import Path
 from base64 import b64encode
 
-import requests, pandas as pd, pandas_ta as ta
-import matplotlib.pyplot as plt
+import requests, pandas as pd
 from PIL import Image
 import google.generativeai as genai
 import openai
+from dateutil.relativedelta import relativedelta
+from plotly.subplots import make_subplots
+import plotly.graph_objects as go
 
 # ── App config ──────────────────────────────────────────────────────────────
 st.markdown("""
@@ -20,230 +22,114 @@ st.markdown("""
 FMP_API_KEY     = st.secrets.get("FMP_API_KEY")
 GOOGLE_API_KEY  = st.secrets.get("GOOGLE_API_KEY")
 OPENAI_API_KEY  = st.secrets.get("OPENAI_API_KEY")
-OUT_DIR         = Path(__file__).parent / "charts"
-OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 openai.api_key = OPENAI_API_KEY
 
-# ── data helpers ────────────────────────────────────────────────────────────
+# ── Date Helper ─────────────────────────────────────────────────────────────
+def get_start_date_months_ago(end_date: dt.date, months_back: int) -> str:
+    return (end_date - relativedelta(months=months_back)).isoformat()
+
+# ── Data Fetch ──────────────────────────────────────────────────────────────
 @st.cache_data(ttl=3_600)
-def get_ohlcv(tkr:str, d_from:str, d_to:str) -> pd.DataFrame:
+def get_ohlcv(tkr: str, d_from: str, d_to: str) -> pd.DataFrame:
     url = (f"https://financialmodelingprep.com/api/v3/historical-price-full/"
            f"{tkr}?apikey={FMP_API_KEY}&from={d_from}&to={d_to}")
     data = requests.get(url, timeout=30).json()
     rows = data.get("historical", []) if isinstance(data, dict) else data
     if not rows: raise ValueError("No price data")
     df = pd.DataFrame(rows).rename(columns=str.lower)
-    if "price" in df and "close" not in df: df["close"] = df["price"]
-    for c in ("open", "high", "low", "close"): df[c] = df.get(c, df["close"])
-    df["volume"] = df.get("volume", 0)
-    return (df.assign(date=lambda d: pd.to_datetime(d["date"]))
-              .set_index("date").sort_index()
-              [["open", "high", "low", "close", "volume"]])
+    df["date"] = pd.to_datetime(df["date"])
+    df.set_index("date", inplace=True)
+    return df[["open", "high", "low", "close", "volume"]].sort_index()
 
-def resample(df, frame):
-    if frame == "Daily": return df
-    rule = "W-FRI" if frame == "Weekly" else "M"
-    agg = {"open": "first", "high": "max", "low": "min", "close": "last", "volume": "sum"}
-    return df.resample(rule).agg(agg).dropna()
+# ── Chart Generator ─────────────────────────────────────────────────────────
+def save_composite_chart_plotly(df, tkr, frame, chart_type="candlestick"):
+    df["sma20"] = df["close"].rolling(window=20).mean()
+    df["sma50"] = df["close"].rolling(window=50).mean()
+    df["sma100"] = df["close"].rolling(window=100).mean()
 
-def add_indicators(df):
-    df["sma20"]  = ta.sma(df["close"], 20)
-    df["sma50"]  = ta.sma(df["close"], 50)
-    df["sma100"] = ta.sma(df["close"], 100)
-    df = pd.concat([df, ta.macd(df["close"])], axis=1)
-    df["rsi"] = ta.rsi(df["close"], 14)
-    return df
+    ema_12 = df["close"].ewm(span=12, adjust=False).mean()
+    ema_26 = df["close"].ewm(span=26, adjust=False).mean()
+    df["macd"] = ema_12 - ema_26
+    df["macd_signal"] = df["macd"].ewm(span=9, adjust=False).mean()
+    df["macd_hist"] = df["macd"] - df["macd_signal"]
 
-def save_composite_chart(df, tkr, frame, use_log_scale=False):
-    import matplotlib.dates as mdates
-    from matplotlib.gridspec import GridSpec
+    delta = df["close"].diff()
+    gain = delta.where(delta > 0, 0).rolling(window=14).mean()
+    loss = -delta.where(delta < 0, 0).rolling(window=14).mean()
+    rs = gain / loss
+    df["rsi"] = 100 - (100 / (1 + rs))
 
-    fig = plt.figure(figsize=(12, 10))
-    gs = GridSpec(4, 1, height_ratios=[3, 1, 1, 1], hspace=0.3)
-
-    # Calculate price range for log/linear selection
-    min_price = df["close"].min()
+    min_price = df["close"].replace(0, pd.NA).min()
     max_price = df["close"].max()
-    price_ratio = max_price / min_price if min_price > 0 else 1
+    price_range_ratio = max_price / min_price if min_price and min_price > 0 else 1
+    use_log = price_range_ratio > 10 and min_price > 1
+    if use_log:
+        df["close"] = df["close"].clip(lower=1.01)
 
-    # 1. Price + SMAs
-    ax1 = fig.add_subplot(gs[0])
-    ax1.plot(df.index, df["close"], label="Close", color="black")
-    for sma, label in [("sma20", "SMA20"), ("sma50", "SMA50"), ("sma100", "SMA100")]:
-        ax1.plot(df.index, df[sma], label=label)
+    fig = make_subplots(rows=4, cols=1, shared_xaxes=True, vertical_spacing=0.02,
+                        row_heights=[0.4, 0.2, 0.2, 0.2],
+                        subplot_titles=("Price & SMAs", "Volume", "MACD", "RSI"))
 
-    # Auto-set scale based on range
-    if use_log_scale:
-        ax1.set_yscale('log')
-        ax1.set_ylabel("Price (log scale)")
-    else:
-        ax1.set_yscale('linear')
-        ax1.set_ylabel("Price")
+    if chart_type == "candlestick":
+        fig.add_trace(go.Candlestick(x=df.index, open=df['open'], high=df['high'],
+                                     low=df['low'], close=df['close'], name='Candlestick',
+                                     increasing_line_color='limegreen', decreasing_line_color='red'), row=1, col=1)
+    elif chart_type == "line":
+        fig.add_trace(go.Scatter(x=df.index, y=df["close"], mode='lines',
+                                 line=dict(color="limegreen"), name="Close Price"), row=1, col=1)
+    elif chart_type == "bar":
+        fig.add_trace(go.Bar(x=df.index, y=df["close"], marker_color="darkcyan", name="Close Price"), row=1, col=1)
 
-    ax1.set_title(f"{tkr} ({frame}) – Price & SMAs")
-    ax1.legend()
-    ax1.grid(True)
+    fig.add_trace(go.Scatter(x=df.index, y=df["sma20"], name="SMA20", line=dict(color="gold")), row=1, col=1)
+    fig.add_trace(go.Scatter(x=df.index, y=df["sma50"], name="SMA50", line=dict(color="orange")), row=1, col=1)
+    fig.add_trace(go.Scatter(x=df.index, y=df["sma100"], name="SMA100", line=dict(color="blue")), row=1, col=1)
 
-    # 2. Volume
-    ax2 = fig.add_subplot(gs[1], sharex=ax1)
-    ax2.bar(df.index, df["volume"], color="gray")
-    ax2.set_title("Volume")
-    ax2.set_ylabel("Volume")
-    ax2.grid(True)
+    fig.add_trace(go.Bar(x=df.index, y=df["volume"], name="Volume", marker_color="lightgray"), row=2, col=1)
+    fig.add_trace(go.Scatter(x=df.index, y=df["macd"], name="MACD", line=dict(color="royalblue")), row=3, col=1)
+    fig.add_trace(go.Scatter(x=df.index, y=df["macd_signal"], name="Signal", line=dict(color="orangered")), row=3, col=1)
+    fig.add_trace(go.Bar(x=df.index, y=df["macd_hist"], name="Histogram", marker_color="darkgray"), row=3, col=1)
 
-    # 3. MACD
-    ax3 = fig.add_subplot(gs[2], sharex=ax1)
-    ax3.plot(df.index, df["MACD_12_26_9"], label="MACD", color="blue")
-    ax3.plot(df.index, df["MACDs_12_26_9"], label="Signal", color="orange")
-    ax3.fill_between(df.index, df["MACDh_12_26_9"], 0, color="gray", alpha=0.3, label="Histogram")
-    ax3.set_title("MACD")
-    ax3.legend()
-    ax3.grid(True)
+    fig.add_trace(go.Scatter(x=df.index, y=df["rsi"], name="RSI", line=dict(color="seagreen")), row=4, col=1)
+    fig.add_hline(y=70, line_dash="dash", line_color="crimson", row=4, col=1)
+    fig.add_hline(y=30, line_dash="dash", line_color="dodgerblue", row=4, col=1)
 
-    # 4. RSI
-    ax4 = fig.add_subplot(gs[3], sharex=ax1)
-    ax4.plot(df.index, df["rsi"], label="RSI", color="green")
-    ax4.axhline(70, color="red", linestyle="--")
-    ax4.axhline(30, color="blue", linestyle="--")
-    ax4.set_title("RSI (14)")
-    ax4.set_ylabel("RSI")
-    ax4.set_ylim(0, 100)
-    ax4.grid(True)
+    fig.update_layout(
+        height=900, showlegend=True,
+        title=f"{tkr} ({frame}) – LLM-Optimized Technical Chart",
+        xaxis_rangeslider_visible=False, template="plotly_white"
+    )
 
-    # Save
-    ax4.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m"))
-    fig.autofmt_xdate()
-    output_path = OUT_DIR / f"{tkr}_{frame}_fullchart.png"
-    fig.tight_layout()
-    fig.savefig(output_path, dpi=120)
-    plt.close(fig)
-    return str(output_path)
+    fig.update_yaxes(type="log" if use_log else "linear", row=1, col=1)
+    if use_log:
+        fig.update_yaxes(type="log", row=1, col=1, tickformat=".2f", dtick=0.1)
 
-def ask_gemini(img, prompt):
-    genai.configure(api_key=GOOGLE_API_KEY)
-    model = genai.GenerativeModel("gemini-2.5-flash-preview-05-20")
-    return model.generate_content([prompt, Image.open(img)]).text.strip()
+      if use_log:
+        fig.update_yaxes(
+            type="log",
+            row=1, col=1,
+            tickformat=".2f",          # Shows two decimal places
+            dtick=0.30103              # Log scale step: 10^0.30103 ≈ 2
+        )
 
-def ask_gpt(img, prompt):
-    image_data = b64encode(open(img, "rb").read()).decode()
-    return openai.chat.completions.create(
-        model="gpt-4o",
-        messages=[
-            {"role": "system", "content": "You are a technical analysis expert."},
-            {"role": "user", "content": [
-                {"type": "text", "text": prompt},
-                {
-                    "type": "image_url",
-                    "image_url": {
-                        "url": f"data:image/png;base64,{image_data}"
-                    }
-                }
-            ]}
-        ],
-        temperature=0.7
-    ).choices[0].message.content
+    return fig
 
 # ── UI ──────────────────────────────────────────────────────────────────────
-st.title("📈 Technical Analysis – Interactive & AI Insights")
+st.title("📈 Technical Analysis – LLM Chart")
 
-# language selector
-c_language = st.selectbox("Language", ["Arabic", "English"])
-
-# layout (no TradingView)
-c_sym, c_from, c_to, c_frm = st.columns([3, 2, 2, 2])
+c_sym, c_months, c_frame, c_type = st.columns([3, 2, 2, 2])
 ticker_symbol = c_sym.text_input("Ticker Symbol", "AAPL").upper().strip()
-today = dt.date.today()
-date_from = c_from.date_input("From", today - dt.timedelta(days=36500))
-date_to   = c_to.date_input("To", today)
-frame     = c_frm.selectbox("Indicator frame", ["Daily", "Weekly", "Monthly"])
+months_back   = c_months.selectbox("Months Back", list(range(0, 25)), index=6)
+frame         = c_frame.selectbox("Indicator Frame", ["Daily", "Weekly", "Monthly"])
+chart_type    = c_type.selectbox("Chart Type", ["candlestick", "line", "bar"])
 
-# Log/Linear scale controls
-col_auto, col_theme, col_log, col_btn = st.columns([1, 2, 2, 1])
-autosz  = col_auto.checkbox("Autosize width", True)
-theme   = col_theme.radio("Theme", ["auto", "light", "dark"], horizontal=True)
-force_log = col_log.checkbox("Force log scale (price)", value=False)
-run_btn = col_btn.button(" Generate AI Analysis")
-
-tkr = ticker_symbol
-
-# AI Analysis
-if run_btn:
-    if date_from >= date_to:
-        st.error("From-date must precede To-date")
-        st.stop()
-
-    if not (FMP_API_KEY and GOOGLE_API_KEY and OPENAI_API_KEY):
-        st.info("Add FMP_API_KEY, GOOGLE_API_KEY, and OPENAI_API_KEY to secrets")
-        st.stop()
-
+if st.button("🔍 Generate Chart"):
     try:
-        with st.spinner("Fetching price data …"):
-            raw = get_ohlcv(tkr, date_from.isoformat(), date_to.isoformat())
-            df = add_indicators(resample(raw, frame))
-
-        # Determine log/linear scale (auto or forced)
-        min_price = df["close"].min()
-        max_price = df["close"].max()
-        price_ratio = max_price / min_price if min_price > 0 else 1
-        log_threshold = 10  # You can adjust this value as needed
-        use_log_scale = price_ratio > log_threshold or force_log
-
-        # Save + show chart
-        cmp = save_composite_chart(df, tkr, frame, use_log_scale=use_log_scale)
-        st.subheader("🖼️ Composite Price Chart (Python-generated)")
-        st.image(cmp, caption=f"{tkr} – {frame} Composite Chart", use_column_width=True)
-
-        # Prompt
-        prompt = textwrap.dedent(f"""
-        **Role:** Expert Market Technician specializing in pure price action analysis. You master Elliott Wave theory, Wyckoff methodology, 
-        and classical chart patterns. All analysis must derive exclusively from **price structure, volume, and market geometry**. Response in {c_language} language.
-
-        **Absolute Rules:**  
-        ✅ Prioritize: Candlestick patterns, volume-profile, swing structure, institutional accumulation/distribution signs and chart indicators.
-
-        #### 1. **Market Structure Framework**
-        - **Trend Identification:** swing highs/lows, Wyckoff phase  
-        - **Critical Levels:** 3 support/resistance zones, major pivots
-
-        #### 2. **Pattern Recognition**
-        - **Classical Patterns:** e.g., H&S, Triangles  
-        - **Elliott Wave Count:** likely wave, alt count %  
-        - **Candlestick Signals:** clusters of reversals
-
-        #### 3. **Projections & Risk Zones**
-        - **Price Targets:** +30d/+60d/+252d  
-        - **Failure Scenarios:** invalidation levels, stop zones
-
-        #### 4. **Synthesis**
-        - **Bias:** Bullish/Base/Bearish (1–5 scale)  
-        - **Entry Triggers:** breakout + volume  
-        - **Timeframe Alignment:** conflicts if any
-        """)
-
-        # Tabs
-        tabs = st.tabs(["Model 1", "Model 2"])
-        with tabs[0]:
-            with st.spinner("AI is thinking …"):
-                gemini_response = ask_gemini(cmp, prompt)
-                if c_language.lower() == "arabic":
-                    st.markdown(
-                        f"""<div dir=\"rtl\" style=\"text-align: right; font-family: 'Cairo', sans-serif;\">{gemini_response}</div>""",
-                        unsafe_allow_html=True
-                    )
-                else:
-                    st.markdown(gemini_response)
-
-        with tabs[1]:
-            with st.spinner("GPT is thinking …"):
-                gpt_response = ask_gpt(cmp, prompt)
-                if c_language.lower() == "arabic":
-                    st.markdown(
-                        f"""<div dir=\"rtl\" style=\"text-align: right; font-family: 'Cairo', sans-serif;\">{gpt_response}</div>""",
-                        unsafe_allow_html=True
-                    )
-                else:
-                    st.markdown(gpt_response)
-
+        end_date = dt.date.today()
+        start_date = get_start_date_months_ago(end_date, months_back)
+        with st.spinner("Fetching data and plotting chart …"):
+            df = get_ohlcv(ticker_symbol, start_date, end_date.isoformat())
+            fig = save_composite_chart_plotly(df, ticker_symbol, frame, chart_type)
+            st.plotly_chart(fig, use_container_width=True)
     except Exception as e:
-        st.error(f"Error: {e}")
+        st.error(f"⚠️ Error: {e}")
