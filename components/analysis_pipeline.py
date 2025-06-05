@@ -274,9 +274,8 @@ def process_symbol_logic(
         logger.error(f"Error during initial FMP call for filling date for {symbol_to_process}: {e_date_fetch}.")
         prospective_fmp_filling_date_str = None
 
-    # STEP 2: Check Neo4j cache
-    if neo4j_driver_instance:
-        def transform_and_check_analysis_report(record_cursor_ar, prospective_fmp_filling_date_str, symbol_to_process):
+
+def transform_and_check_analysis_report(record_cursor_ar, prospective_fmp_filling_date_str, symbol_to_process):
             """
             Neo4j transformer for cache check: returns a full cached report dict if the node matches the expected period.
             """
