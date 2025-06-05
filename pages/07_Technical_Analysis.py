@@ -101,16 +101,14 @@ def save_composite_chart_plotly(df, tkr, frame, chart_type="candlestick"):
     )
 
     fig.update_yaxes(type="log" if use_log else "linear", row=1, col=1)
-    if use_log:
-        fig.update_yaxes(type="log", row=1, col=1, tickformat=".2f", dtick=0.1)
 
-      if use_log:
-        fig.update_yaxes(
-            type="log",
-            row=1, col=1,
-            tickformat=".2f",          # Shows two decimal places
-            dtick=0.30103              # Log scale step: 10^0.30103 ≈ 2
-        )
+  if use_log:
+    fig.update_yaxes(
+    type="log",
+    row=1, col=1,
+    tickformat=".2f",          # Shows two decimal places
+    dtick=0.30103              # Log scale step: 10^0.30103 ≈ 2
+    )
 
     return fig
 
