@@ -120,6 +120,14 @@ def save_composite_chart_plotly(df, tkr, frame, chart_type="candlestick"):
         dtick=0.30103              # Log scale step: 10^0.30103 ≈ 2
     )
 
+    if use_log:
+        fig.update_yaxes(
+        type="log",
+        row=1, col=1,
+        tickformat=".2f",          # Shows two decimal places
+        dtick=0.10103              # Log scale step: 10^0.30103 ≈ 2
+    )
+
     return fig
 
 # ── UI ──────────────────────────────────────────────────────────────────────
