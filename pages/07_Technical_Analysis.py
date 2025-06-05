@@ -146,24 +146,10 @@ def save_composite_chart_plotly(df, tkr, frame, chart_type="candlestick"):
     return fig
 
 
-def ask_gpt(img, prompt):
-    image_data = b64encode(open(img, "rb").read()).decode()
-    return openai.chat.completions.create(
-        model="gpt-4o",
-        messages=[
-            {"role": "system", "content": "You are a technical analysis expert."},
-            {"role": "user", "content": [
-                {"type": "text", "text": prompt},
-                {
-                    "type": "image_url",
-                    "image_url": {
-                        "url": f"data:image/png;base64,{image_data}"
-                    }
-                }
-            ]}
-        ],
-        temperature=0.7
-    ).choices[0].message.content
+def ask_gemini(img, prompt):
+    genai.configure(api_key=GOOGLE_API_KEY)
+    model = genai.GenerativeModel("gemini-2.5-flash-preview-05-20")
+    return model.generate_content([prompt, Image.open(img)]).text.strip()
 
 
 # ── UI ──────────────────────────────────────────────────────────────────────
