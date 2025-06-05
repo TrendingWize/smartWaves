@@ -110,7 +110,7 @@ def save_composite_chart_plotly(df, tkr, frame, chart_type="candlestick"):
     log_threshold = 1  # You can adjust this value as needed
     use_log_scale = price_ratio > log_threshold or force_log
 
-    if use_log:
+    if use_log_scale:
         fig.update_yaxes(
         type="log",
         row=1, col=1,
