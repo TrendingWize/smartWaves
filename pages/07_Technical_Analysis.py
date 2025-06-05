@@ -13,6 +13,20 @@ from dateutil.relativedelta import relativedelta
 from plotly.subplots import make_subplots
 import plotly.graph_objects as go
 
+
+def resample(df: pd.DataFrame, frame: str) -> pd.DataFrame:
+    if frame == "Daily":
+        return df
+    rule = "W-FRI" if frame == "Weekly" else "M"
+    agg = {
+        "open": "first",
+        "high": "max",
+        "low": "min",
+        "close": "last",
+        "volume": "sum"
+    }
+    return df.resample(rule).agg(agg).dropna()
+    
 # ── App config ──────────────────────────────────────────────────────────────
 st.markdown("""
 <link href="https://fonts.googleapis.com/css2?family=Cairo&display=swap" rel="stylesheet">
