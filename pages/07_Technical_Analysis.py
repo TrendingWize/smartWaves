@@ -132,10 +132,18 @@ st.title("📈 Technical Analysis – LLM Chart")
 
 c_sym, c_from, c_to, c_frame, c_type = st.columns([2, 2, 2, 2, 2])
 ticker_symbol = c_sym.text_input("Ticker Symbol", "AAPL").upper().strip()
-start_date = c_from.selectbox("Start Date", [dt.date.today() - relativedelta(months=i) for i in range(1, 501)]) - relativedelta(months=i) for i in range(1, 501)]) - relativedelta(months=i) for i in range(1, 501)]) - dt.timedelta(days=180))
-end_date = c_to.selectbox("End Date", [dt.date.today() - relativedelta(months=i) for i in range(0, 500)]) - relativedelta(months=i) for i in range(0, 500)]) - relativedelta(months=i) for i in range(0, 500)]))
+
+# List of start/end options (dates)
+start_options = [dt.date.today() - relativedelta(months=i) for i in range(1, 501)]
+end_options = [dt.date.today() - relativedelta(months=i) for i in range(0, 500)]
+
+# Dropdowns
+start_date = c_from.selectbox("Start Date", start_options)
+end_date = c_to.selectbox("End Date", end_options)
+
 frame = c_frame.selectbox("Indicator Frame", ["Daily", "Weekly", "Monthly"])
 chart_type = c_type.selectbox("Chart Type", ["candlestick", "line", "bar"])
+
 
 if st.button("🔍 Generate Chart"):
     if start_date >= end_date:
