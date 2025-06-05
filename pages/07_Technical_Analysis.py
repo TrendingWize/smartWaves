@@ -199,7 +199,48 @@ if run_btn:
             df = resample(df, frame)
             fig = save_composite_chart_plotly(df, ticker_symbol, frame, chart_type)
             st.plotly_chart(fig, use_container_width=True)
+ # Prompt
+            prompt = textwrap.dedent(f"""
+        **Role:** Expert Market Technician specializing in pure price action analysis. You master Elliott Wave theory, Wyckoff methodology, 
+        and classical chart patterns. All analysis must derive exclusively from **price structure, volume, and market geometry**. Response in {c_language} language.
+
+        **Absolute Rules:**  
+        ✅ Prioritize: Candlestick patterns, volume-profile, swing structure, institutional accumulation/distribution signs and chart indicators.
+
+        #### 1. **Market Structure Framework**
+        - **Trend Identification:** swing highs/lows, Wyckoff phase  
+        - **Critical Levels:** 3 support/resistance zones, major pivots
+
+        #### 2. **Pattern Recognition**
+        - **Classical Patterns:** e.g., H&S, Triangles  
+        - **Elliott Wave Count:** likely wave, alt count %  
+        - **Candlestick Signals:** clusters of reversals
+
+        #### 3. **Projections & Risk Zones**
+        - **Price Targets:** +30d/+60d/+252d  
+        - **Failure Scenarios:** invalidation levels, stop zones
+
+        #### 4. **Synthesis**
+        - **Bias:** Bullish/Base/Bearish (1–5 scale)  
+        - **Entry Triggers:** breakout + volume  
+        - **Timeframe Alignment:** conflicts if any
+        """)
+
+        # Tabs
+            tabs = st.tabs(["Gemini", "GPT"])
+            with tabs[0]:
+                with st.spinner("Gemini is thinking …"):
+                    gemini_response = ask_gemini(cmp, prompt)
+                    if c_language.lower() == "arabic":
+                        st.markdown(
+                        f"""<div dir=\"rtl\" style=\"text-align: right; font-family: 'Cairo', sans-serif;\">{gemini_response}</div>""",
+                            unsafe_allow_html=True
+                            )
+                    else:
+                        st.markdown(gemini_response)
+
     except Exception as e:
         st.error(f"Error: {e}")
+
 
 
