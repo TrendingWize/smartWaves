@@ -438,11 +438,4 @@ def transform_and_check_analysis_report(record_cursor_ar, prospective_fmp_fillin
                     logger.warning(f"ISSUES processing {symbol_to_process}. Final result object: {str(generated_analysis_json)[:200]}...")
                 return generated_analysis_json
                 
-                except RuntimeError as e_runtime:
-                    logger.error(f"RUNTIME ERROR for {symbol_to_process} during full FMP fetch: {e_runtime}", exc_info=True)
-                    return {"status": "runtime_error_fmp_full", "symbol": symbol_to_process, "error": str(e_runtime), "fmp_data_on_error": fmp_company_data}
-                except Exception as e_main:
-                    logger.error(f"OVERALL FAILED for {symbol_to_process} in main block: {e_main}", exc_info=True)
-                    return {"status": "overall_failure_main_process", "symbol": symbol_to_process, "error": str(e_main)}
-        
-        # ---- END OF FILE ----
+               
