@@ -106,6 +106,9 @@ def similar_companies_tab_content() -> None:
             st.error("⚠️ Start year must be before or same as end year")
             st.stop()
 
+        st.write("Candidate peers:", candidate_peers)
+
+
         # Use the fetched lists for options
         selected_sectors = st.multiselect(
             "Filter by Sector (for candidates)",
