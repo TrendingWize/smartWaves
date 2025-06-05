@@ -125,7 +125,13 @@ def save_composite_chart_plotly(df, tkr, frame, chart_type="candlestick"):
 
     # Apply log or linear Y-axis to the price chart (top subplot)
     fig.update_yaxes(type="log" if use_log else "linear", row=1, col=1)
-
+    
+    # ── Log scale decision ──
+    min_price = df["close"].replace(0, pd.NA).min()
+    max_price = df["close"].max()
+    price_range_ratio = max_price / min_price if min_price and min_price > 0 else 1
+    use_log = price_range_ratio > 1 #and min_price > 1
+    
     if use_log:
         fig.update_yaxes(
             type="log",
