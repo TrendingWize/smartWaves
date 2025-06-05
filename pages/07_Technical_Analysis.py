@@ -55,31 +55,44 @@ def add_indicators(df):
     df["rsi"] = ta.rsi(df["close"], 14)
     return df
 
-def save_composite_chart(df, tkr, frame):
+def save_composite_chart(df, tkr, frame, use_log_scale=False):
     import matplotlib.dates as mdates
     from matplotlib.gridspec import GridSpec
 
     fig = plt.figure(figsize=(12, 10))
     gs = GridSpec(4, 1, height_ratios=[3, 1, 1, 1], hspace=0.3)
 
-    # ── 1. Price + SMAs ─────────────────────
+    # Calculate price range for log/linear selection
+    min_price = df["close"].min()
+    max_price = df["close"].max()
+    price_ratio = max_price / min_price if min_price > 0 else 1
+
+    # 1. Price + SMAs
     ax1 = fig.add_subplot(gs[0])
     ax1.plot(df.index, df["close"], label="Close", color="black")
     for sma, label in [("sma20", "SMA20"), ("sma50", "SMA50"), ("sma100", "SMA100")]:
         ax1.plot(df.index, df[sma], label=label)
+
+    # Auto-set scale based on range
+    if use_log_scale:
+        ax1.set_yscale('log')
+        ax1.set_ylabel("Price (log scale)")
+    else:
+        ax1.set_yscale('linear')
+        ax1.set_ylabel("Price")
+
     ax1.set_title(f"{tkr} ({frame}) – Price & SMAs")
-    ax1.set_ylabel("Price")
     ax1.legend()
     ax1.grid(True)
 
-    # ── 2. Volume ───────────────────────────
+    # 2. Volume
     ax2 = fig.add_subplot(gs[1], sharex=ax1)
     ax2.bar(df.index, df["volume"], color="gray")
     ax2.set_title("Volume")
     ax2.set_ylabel("Volume")
     ax2.grid(True)
 
-    # ── 3. MACD ─────────────────────────────
+    # 3. MACD
     ax3 = fig.add_subplot(gs[2], sharex=ax1)
     ax3.plot(df.index, df["MACD_12_26_9"], label="MACD", color="blue")
     ax3.plot(df.index, df["MACDs_12_26_9"], label="Signal", color="orange")
@@ -88,7 +101,7 @@ def save_composite_chart(df, tkr, frame):
     ax3.legend()
     ax3.grid(True)
 
-    # ── 4. RSI ──────────────────────────────
+    # 4. RSI
     ax4 = fig.add_subplot(gs[3], sharex=ax1)
     ax4.plot(df.index, df["rsi"], label="RSI", color="green")
     ax4.axhline(70, color="red", linestyle="--")
@@ -98,7 +111,7 @@ def save_composite_chart(df, tkr, frame):
     ax4.set_ylim(0, 100)
     ax4.grid(True)
 
-    # ── Save ────────────────────────────────
+    # Save
     ax4.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m"))
     fig.autofmt_xdate()
     output_path = OUT_DIR / f"{tkr}_{frame}_fullchart.png"
@@ -145,10 +158,11 @@ date_from = c_from.date_input("From", today - dt.timedelta(days=365))
 date_to   = c_to.date_input("To", today)
 frame     = c_frm.selectbox("Indicator frame", ["Daily", "Weekly", "Monthly"])
 
-height = st.slider("Chart height (px)", 400, 1000, 750)
-col_auto, col_theme, col_btn = st.columns([1, 3, 1])
+# Log/Linear scale controls
+col_auto, col_theme, col_log, col_btn = st.columns([1, 2, 2, 1])
 autosz  = col_auto.checkbox("Autosize width", True)
 theme   = col_theme.radio("Theme", ["auto", "light", "dark"], horizontal=True)
+force_log = col_log.checkbox("Force log scale (price)", value=False)
 run_btn = col_btn.button(" Generate AI Analysis")
 
 tkr = ticker_symbol
@@ -168,8 +182,15 @@ if run_btn:
             raw = get_ohlcv(tkr, date_from.isoformat(), date_to.isoformat())
             df = add_indicators(resample(raw, frame))
 
+        # Determine log/linear scale (auto or forced)
+        min_price = df["close"].min()
+        max_price = df["close"].max()
+        price_ratio = max_price / min_price if min_price > 0 else 1
+        log_threshold = 10  # You can adjust this value as needed
+        use_log_scale = price_ratio > log_threshold or force_log
+
         # Save + show chart
-        cmp = save_composite_chart(df, tkr, frame)
+        cmp = save_composite_chart(df, tkr, frame, use_log_scale=use_log_scale)
         st.subheader("🖼️ Composite Price Chart (Python-generated)")
         st.image(cmp, caption=f"{tkr} – {frame} Composite Chart", use_column_width=True)
 
@@ -201,7 +222,7 @@ if run_btn:
         """)
 
         # Tabs
-        tabs = st.tabs(["Model 1", "Model 2"])
+        tabs = st.tabs(["Gemini", "GPT"])
         with tabs[0]:
             with st.spinner("Gemini is thinking …"):
                 gemini_response = ask_gemini(cmp, prompt)
