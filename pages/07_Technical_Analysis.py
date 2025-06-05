@@ -221,7 +221,7 @@ if run_btn:
 
             tabs = st.tabs(["Gemini"])
             with tabs[0]:
-                with st.spinner("Gemini is thinking …"):
+                with st.spinner("AI model is thinking …"):
                     gemini_response = ask_gemini(img_path, prompt)
                     if c_language.lower() == "arabic":
                         st.markdown(
