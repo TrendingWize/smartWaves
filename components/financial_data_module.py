@@ -256,6 +256,12 @@ class FinancialDataModule:
             try:
                 quote_data = fut_quotes[tkr].result()
                 income_data = fut_income[tkr].result()
+                income_data = fut_income.result()
+                if not income_data or not isinstance(income_data, list) or len(income_data) <= current_period_back:
+                     raise RuntimeError(
+                    f"No/Insufficient income statements for {symbol_param} (need {current_period_back+1}, got {len(income_data) if income_data else 0})"
+                    )
+
                 bs_data = fut_bs[tkr].result() # Changed variable name
                 
                 row = {}
