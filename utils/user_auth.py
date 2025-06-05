@@ -6,6 +6,7 @@ import hashlib
 import uuid # For session tokens
 from typing import Dict, List, Tuple, Any, Optional
 from styles import load_global_css
+import pandas as pd
 
 DATABASE_NAME = 'users.db'
 
