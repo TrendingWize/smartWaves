@@ -13,20 +13,6 @@ from dateutil.relativedelta import relativedelta
 from plotly.subplots import make_subplots
 import plotly.graph_objects as go
 
-
-def resample(df: pd.DataFrame, frame: str) -> pd.DataFrame:
-    if frame == "Daily":
-        return df
-    rule = "W-FRI" if frame == "Weekly" else "M"
-    agg = {
-        "open": "first",
-        "high": "max",
-        "low": "min",
-        "close": "last",
-        "volume": "sum"
-    }
-    return df.resample(rule).agg(agg).dropna()
-    
 # ── App config ──────────────────────────────────────────────────────────────
 st.markdown("""
 <link href="https://fonts.googleapis.com/css2?family=Cairo&display=swap" rel="stylesheet">
@@ -43,8 +29,21 @@ openai.api_key = OPENAI_API_KEY
 def get_start_date_months_ago(end_date: dt.date, months_back: int) -> str:
     return (end_date - relativedelta(months=months_back)).isoformat()
 
-# ── Data Fetch ──────────────────────────────────────────────────────────────
-@st.cache_data(ttl=3_600)
+# ── Data Fetch ─────────────────────────────────────────────────────────────
+def resample(df: pd.DataFrame, frame: str) -> pd.DataFrame:
+    if frame == "Daily":
+        return df
+    rule = "W-FRI" if frame == "Weekly" else "M"
+    agg = {
+        "open": "first",
+        "high": "max",
+        "low": "min",
+        "close": "last",
+        "volume": "sum"
+    }
+    return df.resample(rule).agg(agg).dropna()
+
+# ── Data Fetch ─────────────────────────────────────────────────────────────(ttl=3_600)
 def get_ohlcv(tkr: str, d_from: str, d_to: str) -> pd.DataFrame:
     url = (f"https://financialmodelingprep.com/api/v3/historical-price-full/"
            f"{tkr}?apikey={FMP_API_KEY}&from={d_from}&to={d_to}")
@@ -82,7 +81,7 @@ def save_composite_chart_plotly(df, tkr, frame, chart_type="candlestick"):
         df["close"] = df["close"].clip(lower=1.01)
 
     fig = make_subplots(rows=4, cols=1, shared_xaxes=True, vertical_spacing=0.02,
-                        row_heights=[0.6, 0.2, 0.2, 0.2],
+                        row_heights=[0.4, 0.2, 0.2, 0.2],
                         subplot_titles=("Price & SMAs", "Volume", "MACD", "RSI"))
 
     if chart_type == "candlestick":
@@ -108,12 +107,6 @@ def save_composite_chart_plotly(df, tkr, frame, chart_type="candlestick"):
     fig.add_hline(y=70, line_dash="dash", line_color="crimson", row=4, col=1)
     fig.add_hline(y=30, line_dash="dash", line_color="dodgerblue", row=4, col=1)
 
-    fig.update_layout(
-        height=900, showlegend=True,
-        title=f"{tkr} ({frame}) – LLM-Optimized Technical Chart",
-        xaxis_rangeslider_visible=False, template="plotly_white"
-    )
-
     fig.update_yaxes(type="log" if use_log else "linear", row=1, col=1)
     if use_log:
         fig.update_yaxes(type="log", row=1, col=1, tickformat=".2f", dtick=0.30103)
@@ -132,9 +125,6 @@ def save_composite_chart_plotly(df, tkr, frame, chart_type="candlestick"):
         dtick=0.30103              # Log scale step: 10^0.30103 ≈ 2
     )
 
-
-
-
     return fig
 
 # ── UI ──────────────────────────────────────────────────────────────────────
@@ -142,18 +132,10 @@ st.title("📈 Technical Analysis – LLM Chart")
 
 c_sym, c_from, c_to, c_frame, c_type = st.columns([2, 2, 2, 2, 2])
 ticker_symbol = c_sym.text_input("Ticker Symbol", "AAPL").upper().strip()
-
-# Generate dropdown values
-start_options = [dt.date.today() - relativedelta(months=i) for i in range(1, 501)]
-end_options = [dt.date.today() - relativedelta(months=i) for i in range(0, 500)]
-
-# Streamlit widgets
-start_date = c_from.selectbox("Start Date", start_options)
-end_date = c_to.selectbox("End Date", end_options)
-
+start_date = c_from.selectbox("Start Date", [dt.date.today() - relativedelta(months=i) for i in range(1, 501)]) - relativedelta(months=i) for i in range(1, 501)]) - dt.timedelta(days=180))
+end_date = c_to.selectbox("End Date", [dt.date.today() - relativedelta(months=i) for i in range(0, 500)]) - relativedelta(months=i) for i in range(0, 500)]))
 frame = c_frame.selectbox("Indicator Frame", ["Daily", "Weekly", "Monthly"])
 chart_type = c_type.selectbox("Chart Type", ["candlestick", "line", "bar"])
-
 
 if st.button("🔍 Generate Chart"):
     if start_date >= end_date:
@@ -162,6 +144,7 @@ if st.button("🔍 Generate Chart"):
         try:
             with st.spinner("Fetching data and plotting chart …"):
                 df = get_ohlcv(ticker_symbol, start_date.isoformat(), end_date.isoformat())
+df = resample(df, frame)
                 fig = save_composite_chart_plotly(df, ticker_symbol, frame, chart_type)
                 st.plotly_chart(fig, use_container_width=True)
         except Exception as e:
