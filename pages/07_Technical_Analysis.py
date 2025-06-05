@@ -222,7 +222,7 @@ if run_btn:
         """)
 
         # Tabs
-        tabs = st.tabs(["Gemini", "GPT"])
+        tabs = st.tabs(["Model 1", "Model 2"])
         with tabs[0]:
             with st.spinner("AI is thinking …"):
                 gemini_response = ask_gemini(cmp, prompt)
