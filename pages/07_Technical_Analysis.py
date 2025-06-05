@@ -112,6 +112,14 @@ def save_composite_chart_plotly(df, tkr, frame, chart_type="candlestick"):
         dtick=0.30103              # Log scale step: 10^0.30103 ≈ 2
     )
 
+    if use_log:
+        fig.update_yaxes(
+        type="log",
+        row=1, col=1,
+        tickformat=".2f",          # Shows two decimal places
+        dtick=0.30103              # Log scale step: 10^0.30103 ≈ 2
+    )
+
     return fig
 
 # ── UI ──────────────────────────────────────────────────────────────────────
@@ -119,8 +127,8 @@ st.title("📈 Technical Analysis – LLM Chart")
 
 c_sym, c_from, c_to, c_frame, c_type = st.columns([2, 2, 2, 2, 2])
 ticker_symbol = c_sym.text_input("Ticker Symbol", "AAPL").upper().strip()
-start_date = c_from.date_input("Start Date", dt.date.today() - dt.timedelta(days=180))
-end_date = c_to.date_input("End Date", dt.date.today())
+start_date = c_from.selectbox("Start Date", [dt.date.today() - relativedelta(months=i) for i in range(1, 501)]) - dt.timedelta(days=180))
+end_date = c_to.selectbox("End Date", [dt.date.today() - relativedelta(months=i) for i in range(0, 500)]))
 frame = c_frame.selectbox("Indicator Frame", ["Daily", "Weekly", "Monthly"])
 chart_type = c_type.selectbox("Chart Type", ["candlestick", "line", "bar"])
 
