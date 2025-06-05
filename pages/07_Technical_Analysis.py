@@ -68,7 +68,7 @@ def save_composite_chart_plotly(df, tkr, frame, chart_type="candlestick"):
         df["close"] = df["close"].clip(lower=1.01)
 
     fig = make_subplots(rows=4, cols=1, shared_xaxes=True, vertical_spacing=0.02,
-                        row_heights=[0.4, 0.2, 0.2, 0.2],
+                        row_heights=[0.6, 0.2, 0.2, 0.2],
                         subplot_titles=("Price & SMAs", "Volume", "MACD", "RSI"))
 
     if chart_type == "candlestick":
