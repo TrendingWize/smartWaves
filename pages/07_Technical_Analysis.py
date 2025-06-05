@@ -186,6 +186,9 @@ if run_btn:
             df = resample(df, frame)
             fig = save_composite_chart_plotly(df, ticker_symbol, frame, chart_type)
             st.plotly_chart(fig, use_container_width=True)
+
+                    # Save + show chart
+
  # Prompt
             prompt = textwrap.dedent(f"""
         **Role:** Expert Market Technician specializing in pure price action analysis. You master Elliott Wave theory, Wyckoff methodology, 
@@ -217,7 +220,7 @@ if run_btn:
             tabs = st.tabs(["Gemini", "GPT"])
             with tabs[0]:
                 with st.spinner("Gemini is thinking …"):
-                    gemini_response = ask_gemini(cmp, prompt)
+                    gemini_response = ask_gemini(fig, prompt)
                     if c_language.lower() == "arabic":
                         st.markdown(
                         f"""<div dir=\"rtl\" style=\"text-align: right; font-family: 'Cairo', sans-serif;\">{gemini_response}</div>""",
