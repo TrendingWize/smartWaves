@@ -152,8 +152,9 @@ if st.button("🔍 Generate Chart"):
         try:
             with st.spinner("Fetching data and plotting chart …"):
                 df = get_ohlcv(ticker_symbol, start_date.isoformat(), end_date.isoformat())
-df = resample(df, frame)
+                df = resample(df, frame)
                 fig = save_composite_chart_plotly(df, ticker_symbol, frame, chart_type)
                 st.plotly_chart(fig, use_container_width=True)
         except Exception as e:
             st.error(f"⚠️ Error: {e}")
+
