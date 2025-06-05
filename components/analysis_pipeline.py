@@ -270,7 +270,7 @@ def process_symbol_logic(
             logger.info(f"Prospective FMP filling date for {symbol_to_process} is {prospective_fmp_filling_date_str}")
         else:
             logger.warning(f"Could not determine prospective FMP filling date for {symbol_to_process}.")
-    except Exception as e_datdef 
+    except Exception as e_datdef:
         logger.error(f"Some error: {e_dat}")
         
     process_symbol_logic(
