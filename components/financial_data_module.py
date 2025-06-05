@@ -14,6 +14,7 @@ import os
 # Config dataclass (if you want to keep config inside the module)
 from dataclasses import dataclass, field
 
+current_period_back =0
 DEFAULT_MAX_WORKERS = os.cpu_count() or 4
 logger = logging.getLogger("financial_data_module")
 
