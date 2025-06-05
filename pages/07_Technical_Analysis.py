@@ -176,6 +176,7 @@ end_date = c_to.selectbox("End Date", end_options)
 frame = c_frame.selectbox("Indicator Frame", ["Daily", "Weekly", "Monthly"])
 chart_type = c_type.selectbox("Chart Type", ["candlestick", "line", "bar"])
 
+col_btn = st.columns([1, 3, 1])
 run_btn = col_btn.button(" Generate AI Analysis")
 
 if run_btn:
