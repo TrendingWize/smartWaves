@@ -106,8 +106,6 @@ def similar_companies_tab_content() -> None:
             st.error("⚠️ Start year must be before or same as end year")
             st.stop()
 
-        st.write("Candidate peers:", candidate_peers)
-
 
         # Use the fetched lists for options
         selected_sectors = st.multiselect(
@@ -476,6 +474,8 @@ def similarity_over_time_tab_content():
                         movers.append((sym, sim_start, sim_end, delta))
                 except Exception:
                     continue
+
+            st.write("Candidate peers:", candidate_peers)
 
             # Sort by delta descending, take top 20
             movers.sort(key=lambda x: -x[3])
