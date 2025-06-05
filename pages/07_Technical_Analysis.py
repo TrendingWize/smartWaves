@@ -64,7 +64,8 @@ def save_composite_chart_plotly(df, tkr, frame, chart_type="candlestick"):
     max_price = df["close"].max()
     price_range_ratio = max_price / min_price if min_price and min_price > 0 else 1
     use_log = price_range_ratio > 10 and min_price > 1
-
+    if use_log:
+        df["close"] = df["close"].clip(lower=1.01)
 
     fig = make_subplots(rows=4, cols=1, shared_xaxes=True, vertical_spacing=0.02,
                         row_heights=[0.4, 0.2, 0.2, 0.2],
@@ -100,6 +101,8 @@ def save_composite_chart_plotly(df, tkr, frame, chart_type="candlestick"):
     )
 
     fig.update_yaxes(type="log" if use_log else "linear", row=1, col=1)
+    if use_log:
+        fig.update_yaxes(type="log", row=1, col=1, tickformat=".2f", dtick=0.30103)
 
     if use_log:
         fig.update_yaxes(
@@ -114,19 +117,21 @@ def save_composite_chart_plotly(df, tkr, frame, chart_type="candlestick"):
 # ── UI ──────────────────────────────────────────────────────────────────────
 st.title("📈 Technical Analysis – LLM Chart")
 
-c_sym, c_months, c_frame, c_type = st.columns([3, 2, 2, 2])
+c_sym, c_from, c_to, c_frame, c_type = st.columns([2, 2, 2, 2, 2])
 ticker_symbol = c_sym.text_input("Ticker Symbol", "AAPL").upper().strip()
-months_back   = c_months.selectbox("Months Back", list(range(0, 25)), index=6)
-frame         = c_frame.selectbox("Indicator Frame", ["Daily", "Weekly", "Monthly"])
-chart_type    = c_type.selectbox("Chart Type", ["candlestick", "line", "bar"])
+start_date = c_from.date_input("Start Date", dt.date.today() - dt.timedelta(days=180))
+end_date = c_to.date_input("End Date", dt.date.today())
+frame = c_frame.selectbox("Indicator Frame", ["Daily", "Weekly", "Monthly"])
+chart_type = c_type.selectbox("Chart Type", ["candlestick", "line", "bar"])
 
 if st.button("🔍 Generate Chart"):
-    try:
-        end_date = dt.date.today()
-        start_date = get_start_date_months_ago(end_date, months_back)
-        with st.spinner("Fetching data and plotting chart …"):
-            df = get_ohlcv(ticker_symbol, start_date, end_date.isoformat())
-            fig = save_composite_chart_plotly(df, ticker_symbol, frame, chart_type)
-            st.plotly_chart(fig, use_container_width=True)
-    except Exception as e:
-        st.error(f"⚠️ Error: {e}")
+    if start_date >= end_date:
+        st.error("Start date must be before end date.")
+    else:
+        try:
+            with st.spinner("Fetching data and plotting chart …"):
+                df = get_ohlcv(ticker_symbol, start_date.isoformat(), end_date.isoformat())
+                fig = save_composite_chart_plotly(df, ticker_symbol, frame, chart_type)
+                st.plotly_chart(fig, use_container_width=True)
+        except Exception as e:
+            st.error(f"⚠️ Error: {e}")
