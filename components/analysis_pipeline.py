@@ -414,36 +414,35 @@ def transform_and_check_analysis_report(record_cursor_ar, prospective_fmp_fillin
                 generated_analysis_json['metadata'] = current_meta
                 generated_analysis_json['fmp_data_for_analysis'] = fmp_company_data
         
-            # STEP 5: Save new analysis to Neo4j (only if no errors from OpenAI)
-        # STEP 5: Save new analysis to Neo4j (only if no errors from OpenAI)
-        if (
-            neo4j_driver_instance
-            and isinstance(generated_analysis_json, dict)
-            and not any(k.startswith("error_") for k in generated_analysis_json)
-        ):
-            try:
-                with neo4j_driver_instance.session(database_=None) as session:
-                    session.execute_write(
-                        save_analysis_to_neo4j,
-                        symbol_param=symbol_to_process,
-                        analysis_report_data=generated_analysis_json
-                    )
-            except Exception as e_neo_save:
-                logger.error(f"Error saving NEW analysis to Neo4j for {symbol_to_process}: {e_neo_save}", exc_info=True)
-                if isinstance(generated_analysis_json, dict):
-                    generated_analysis_json['error_neo4j_save'] = str(e_neo_save)
-
-        if isinstance(generated_analysis_json, dict) and not any(k.startswith("error_") for k in generated_analysis_json):
-            logger.info(f"SUCCESS (new analysis by OpenAI): {symbol_to_process} processed in {time.time() - start_ts:.2f} seconds.")
-        else:
-            logger.warning(f"ISSUES processing {symbol_to_process}. Final result object: {str(generated_analysis_json)[:200]}...")
-        return generated_analysis_json
-
-except RuntimeError as e_runtime:
-    logger.error(f"RUNTIME ERROR for {symbol_to_process} during full FMP fetch: {e_runtime}", exc_info=True)
-    return {"status": "runtime_error_fmp_full", "symbol": symbol_to_process, "error": str(e_runtime), "fmp_data_on_error": fmp_company_data}
-except Exception as e_main:
-    logger.error(f"OVERALL FAILED for {symbol_to_process} in main block: {e_main}", exc_info=True)
-    return {"status": "overall_failure_main_process", "symbol": symbol_to_process, "error": str(e_main)}
+                # STEP 5: Save new analysis to Neo4j (only if no errors from OpenAI)
+                if (
+                    neo4j_driver_instance
+                    and isinstance(generated_analysis_json, dict)
+                    and not any(k.startswith("error_") for k in generated_analysis_json)
+                ):
+                    try:
+                        with neo4j_driver_instance.session(database_=None) as session:
+                            session.execute_write(
+                                save_analysis_to_neo4j,
+                                symbol_param=symbol_to_process,
+                                analysis_report_data=generated_analysis_json
+                            )
+                    except Exception as e_neo_save:
+                        logger.error(f"Error saving NEW analysis to Neo4j for {symbol_to_process}: {e_neo_save}", exc_info=True)
+                        if isinstance(generated_analysis_json, dict):
+                            generated_analysis_json['error_neo4j_save'] = str(e_neo_save)
+                
+                if isinstance(generated_analysis_json, dict) and not any(k.startswith("error_") for k in generated_analysis_json):
+                    logger.info(f"SUCCESS (new analysis by OpenAI): {symbol_to_process} processed in {time.time() - start_ts:.2f} seconds.")
+                else:
+                    logger.warning(f"ISSUES processing {symbol_to_process}. Final result object: {str(generated_analysis_json)[:200]}...")
+                return generated_analysis_json
+                
+                except RuntimeError as e_runtime:
+                    logger.error(f"RUNTIME ERROR for {symbol_to_process} during full FMP fetch: {e_runtime}", exc_info=True)
+                    return {"status": "runtime_error_fmp_full", "symbol": symbol_to_process, "error": str(e_runtime), "fmp_data_on_error": fmp_company_data}
+                except Exception as e_main:
+                    logger.error(f"OVERALL FAILED for {symbol_to_process} in main block: {e_main}", exc_info=True)
+                    return {"status": "overall_failure_main_process", "symbol": symbol_to_process, "error": str(e_main)}
         
         # ---- END OF FILE ----
