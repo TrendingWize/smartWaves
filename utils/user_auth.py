@@ -238,10 +238,7 @@ def display_ai_analysis_dashboard(analysis_data: Dict[str, Any], metadata: Dict[
             if valid_path_expl and isinstance(current_data_for_expl, dict):
                 expl = current_data_for_expl.get("explanation")
                 classification = current_data_for_expl.get("classification")
-                if expl:
-                    st.markdown(f"**{metric_key_orig.split('.')[-1].replace('_',' ').title()}:** {get_sentiment_html_enhanced(classification)}", unsafe_allow_html=True)
-                    st.markdown(f"<div class='explanation-box'>{expl}</div>", unsafe_allow_html=True)
-
+                
 
         # --- Chart Group 2: Key Margins ---
         st.markdown("<div class='subsection-header-ai'>Key Profitability Margins (%)</div>", unsafe_allow_html=True)
@@ -283,10 +280,7 @@ def display_ai_analysis_dashboard(analysis_data: Dict[str, Any], metadata: Dict[
             if valid_path_expl and isinstance(current_data_for_expl, dict):
                 expl = current_data_for_expl.get("explanation")
                 classification = current_data_for_expl.get("classification")
-                if expl:
-                    st.markdown(f"**{metric_key_orig.split('.')[-1].replace('_',' ').title()}:** {get_sentiment_html_enhanced(classification)}", unsafe_allow_html=True)
-                    st.markdown(f"<div class='explanation-box'>{expl}</div>", unsafe_allow_html=True)
-
+                
     # --- Render other main analysis sections using the generic renderer ---
     sections_in_order_config = [
         # ("financial_performance", "Financial Performance"), # Handled specially above
