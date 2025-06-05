@@ -27,6 +27,7 @@ def _redact(url: str, key: str) -> str:
 class Config:
     fmp_key: str
     openai_key: str = ""
+    openai_model: str = "gpt-4o" 
     neo4j_uri: str = ""
     neo4j_user: str = ""
     neo4j_password: str = ""
