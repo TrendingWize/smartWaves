@@ -154,7 +154,7 @@ c_language = st.selectbox("Language", ["Arabic", "English"])
 c_sym, c_from, c_to, c_frm = st.columns([3, 2, 2, 2])
 ticker_symbol = c_sym.text_input("Ticker Symbol", "AAPL").upper().strip()
 today = dt.date.today()
-date_from = c_from.date_input("From", today - dt.timedelta(days=365))
+date_from = c_from.date_input("From", today - dt.timedelta(days=36500))
 date_to   = c_to.date_input("To", today)
 frame     = c_frm.selectbox("Indicator frame", ["Daily", "Weekly", "Monthly"])
 
