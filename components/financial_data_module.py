@@ -561,7 +561,7 @@ class FinancialDataModule:
         company_sector = profile.get("sector") # Renamed to avoid conflict
         company_industry = profile.get("industry") # Renamed to avoid conflict
     
-        #max_workers_for_pool = max(1, DEFAULT_MAX_WORKERS)
+        max_workers_for_pool = max(1, DEFAULT_MAX_WORKERS)
         with ThreadPoolExecutor(max_workers=max_workers_for_pool) as pool:
             fut_income = pool.submit(
                 self.get_financial_statements,
