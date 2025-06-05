@@ -24,6 +24,7 @@ GOOGLE_API_KEY  = st.secrets.get("GOOGLE_API_KEY")
 OPENAI_API_KEY  = st.secrets.get("OPENAI_API_KEY")
 
 openai.api_key = OPENAI_API_KEY
+c_language = st.selectbox("Language", ["Arabic", "English"])
 
 # ── Date Helper ─────────────────────────────────────────────────────────────
 def get_start_date_months_ago(end_date: dt.date, months_back: int) -> str:
