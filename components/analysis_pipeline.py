@@ -274,15 +274,15 @@ def process_symbol_logic(
         logger.error(f"Some error: {e_dat}")
         
     process_symbol_logic(
-    symbol_to_process: str,
-    current_period_back_val: int,
-    report_period: str,
-    fdm_module_instance,
-    openai_client_instance,
-    neo4j_driver_instance,
-    app_config,
-    prompt_instructions: str,
-):
+        symbol_to_process: str,
+        current_period_back_val: int,
+        report_period: str,
+        fdm_module_instance,
+        openai_client_instance,
+        neo4j_driver_instance,
+        app_config,
+        prompt_instructions: str,
+    ):
     import time, json
     from datetime import datetime as dt_class
     logger = logging.getLogger("annual")
