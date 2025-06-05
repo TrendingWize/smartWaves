@@ -273,7 +273,7 @@ def process_symbol_logic(
     except Exception as e_datdef:
         logger.error(f"Some error: {e_dat}")
         
-process_symbol_logic(
+def process_symbol_logic(
     symbol_to_process: str,
     current_period_back_val: int,
     report_period: str,
