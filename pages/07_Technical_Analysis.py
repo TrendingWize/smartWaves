@@ -7,7 +7,6 @@ from base64 import b64encode
 
 import requests, pandas as pd, pandas_ta as ta
 import matplotlib.pyplot as plt
-from streamlit.components.v1 import html
 from PIL import Image
 import google.generativeai as genai
 import openai
@@ -69,7 +68,6 @@ def save_composite_chart(df, tkr, frame):
     for sma, label in [("sma20", "SMA20"), ("sma50", "SMA50"), ("sma100", "SMA100")]:
         ax1.plot(df.index, df[sma], label=label)
     ax1.set_title(f"{tkr} ({frame}) – Price & SMAs")
-    ax1.set_ylabel("Price (log scale)")
     ax1.set_ylabel("Price")
     ax1.legend()
     ax1.grid(True)
@@ -133,37 +131,19 @@ def ask_gpt(img, prompt):
         temperature=0.7
     ).choices[0].message.content
 
-def tv_chart(sym, interval, theme, height, width, autosize):
-    props = {
-        "symbol": sym, "interval": interval, "theme": theme, "style": "1",
-        "locale": "en", "timezone": "Etc/UTC", "allow_symbol_change": True,
-        "support_host": "https://www.tradingview.com", "height": height
-    }
-    if autosize: props["autosize"] = True
-    else: props["width"] = width or 800
-    outer = f"height:{height}px;" + (f'width:{width or 800}px;' if not autosize else "")
-    html(f"""
-    <div class="tradingview-widget-container" style="{outer}">
-      <div id="tv_widget"></div>
-      <script src="https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js"
-              async type="text/javascript">{json.dumps(props, separators=(',',':'))}</script>
-    </div>
-    """, height=height, width=None if autosize else width or 800, scrolling=False)
-
 # ── UI ──────────────────────────────────────────────────────────────────────
 st.title("📈 Technical Analysis – Interactive & AI Insights")
 
 # language selector
 c_language = st.selectbox("Language", ["Arabic", "English"])
 
-# layout
-c_sym, c_from, c_to, c_frm, c_int = st.columns([3, 2, 2, 2, 2])
-tv_symbol = c_sym.text_input("TradingView Symbol", "NASDAQ:AAPL").upper().strip()
+# layout (no TradingView)
+c_sym, c_from, c_to, c_frm = st.columns([3, 2, 2, 2])
+ticker_symbol = c_sym.text_input("Ticker Symbol", "AAPL").upper().strip()
 today = dt.date.today()
 date_from = c_from.date_input("From", today - dt.timedelta(days=365))
 date_to   = c_to.date_input("To", today)
 frame     = c_frm.selectbox("Indicator frame", ["Daily", "Weekly", "Monthly"])
-tv_int    = c_int.selectbox("TV interval", ["1", "15", "30", "60", "D", "W", "M"], 4)
 
 height = st.slider("Chart height (px)", 400, 1000, 750)
 col_auto, col_theme, col_btn = st.columns([1, 3, 1])
@@ -171,10 +151,7 @@ autosz  = col_auto.checkbox("Autosize width", True)
 theme   = col_theme.radio("Theme", ["auto", "light", "dark"], horizontal=True)
 run_btn = col_btn.button(" Generate AI Analysis")
 
-# tradingview chart
-tkr = re.split(r"[:/]", tv_symbol)[-1]
-chart_theme = "dark" if theme == "auto" and st.get_option("theme.base") == "dark" else (theme if theme != "auto" else "light")
-tv_chart(tv_symbol, tv_int, chart_theme, height, None if autosz else 800, autosz)
+tkr = ticker_symbol
 
 # AI Analysis
 if run_btn:
