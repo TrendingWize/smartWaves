@@ -5,6 +5,7 @@ import sqlite3
 import hashlib
 import uuid # For session tokens
 from typing import Dict, List, Tuple, Any, Optional
+from styles import load_global_css
 
 DATABASE_NAME = 'users.db'
 
