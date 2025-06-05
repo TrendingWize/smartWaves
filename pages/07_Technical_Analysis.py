@@ -64,8 +64,7 @@ def save_composite_chart_plotly(df, tkr, frame, chart_type="candlestick"):
     max_price = df["close"].max()
     price_range_ratio = max_price / min_price if min_price and min_price > 0 else 1
     use_log = price_range_ratio > 10 and min_price > 1
-    if use_log:
-        df["close"] = df["close"].clip(lower=1.01)
+
 
     fig = make_subplots(rows=4, cols=1, shared_xaxes=True, vertical_spacing=0.02,
                         row_heights=[0.4, 0.2, 0.2, 0.2],
@@ -102,12 +101,12 @@ def save_composite_chart_plotly(df, tkr, frame, chart_type="candlestick"):
 
     fig.update_yaxes(type="log" if use_log else "linear", row=1, col=1)
 
-  if use_log:
-    fig.update_yaxes(
-    type="log",
-    row=1, col=1,
-    tickformat=".2f",          # Shows two decimal places
-    dtick=0.30103              # Log scale step: 10^0.30103 ≈ 2
+    if use_log:
+        fig.update_yaxes(
+        type="log",
+        row=1, col=1,
+        tickformat=".2f",          # Shows two decimal places
+        dtick=0.30103              # Log scale step: 10^0.30103 ≈ 2
     )
 
     return fig
