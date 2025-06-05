@@ -56,7 +56,9 @@ def get_ohlcv(tkr: str, d_from: str, d_to: str) -> pd.DataFrame:
     return df[["open", "high", "low", "close", "volume"]].sort_index()
 
 # ── Chart Generator ─────────────────────────────────────────────────────────
+
 def save_composite_chart_plotly(df, tkr, frame, chart_type="candlestick"):
+    # ── Technical Indicators ──
     df["sma20"] = df["close"].rolling(window=20).mean()
     df["sma50"] = df["close"].rolling(window=50).mean()
     df["sma100"] = df["close"].rolling(window=100).mean()
@@ -73,32 +75,37 @@ def save_composite_chart_plotly(df, tkr, frame, chart_type="candlestick"):
     rs = gain / loss
     df["rsi"] = 100 - (100 / (1 + rs))
 
+    # ── Log scale decision ──
     min_price = df["close"].replace(0, pd.NA).min()
     max_price = df["close"].max()
     price_range_ratio = max_price / min_price if min_price and min_price > 0 else 1
     use_log = price_range_ratio > 10 and min_price > 1
-    if use_log:
-        df["close"] = df["close"].clip(lower=1.01)
 
+
+    # ── Plotly Subplots ──
     fig = make_subplots(rows=4, cols=1, shared_xaxes=True, vertical_spacing=0.02,
                         row_heights=[0.4, 0.2, 0.2, 0.2],
                         subplot_titles=("Price & SMAs", "Volume", "MACD", "RSI"))
 
+    # ── Chart Type ──
     if chart_type == "candlestick":
         fig.add_trace(go.Candlestick(x=df.index, open=df['open'], high=df['high'],
                                      low=df['low'], close=df['close'], name='Candlestick',
-                                     increasing_line_color='limegreen', decreasing_line_color='red'), row=1, col=1)
+                                     increasing_line_color='limegreen',
+                                     decreasing_line_color='red'), row=1, col=1)
     elif chart_type == "line":
         fig.add_trace(go.Scatter(x=df.index, y=df["close"], mode='lines',
                                  line=dict(color="limegreen"), name="Close Price"), row=1, col=1)
     elif chart_type == "bar":
         fig.add_trace(go.Bar(x=df.index, y=df["close"], marker_color="darkcyan", name="Close Price"), row=1, col=1)
 
+    # ── Overlays & Indicators ──
     fig.add_trace(go.Scatter(x=df.index, y=df["sma20"], name="SMA20", line=dict(color="gold")), row=1, col=1)
     fig.add_trace(go.Scatter(x=df.index, y=df["sma50"], name="SMA50", line=dict(color="orange")), row=1, col=1)
     fig.add_trace(go.Scatter(x=df.index, y=df["sma100"], name="SMA100", line=dict(color="blue")), row=1, col=1)
 
     fig.add_trace(go.Bar(x=df.index, y=df["volume"], name="Volume", marker_color="lightgray"), row=2, col=1)
+
     fig.add_trace(go.Scatter(x=df.index, y=df["macd"], name="MACD", line=dict(color="royalblue")), row=3, col=1)
     fig.add_trace(go.Scatter(x=df.index, y=df["macd_signal"], name="Signal", line=dict(color="orangered")), row=3, col=1)
     fig.add_trace(go.Bar(x=df.index, y=df["macd_hist"], name="Histogram", marker_color="darkgray"), row=3, col=1)
@@ -107,23 +114,27 @@ def save_composite_chart_plotly(df, tkr, frame, chart_type="candlestick"):
     fig.add_hline(y=70, line_dash="dash", line_color="crimson", row=4, col=1)
     fig.add_hline(y=30, line_dash="dash", line_color="dodgerblue", row=4, col=1)
 
-    fig.update_yaxes(type="log" if use_log else "linear", row=1, col=1)
-    if use_log:
-        fig.update_yaxes(type="log", row=1, col=1, tickformat=".2f", dtick=0.30103)
-
-    min_price = df["close"].min()
-    max_price = df["close"].max()
-    price_ratio = max_price / min_price if min_price > 0 else 1
-    log_threshold = 1  # You can adjust this value as needed
-    use_log_scale = price_ratio > log_threshold or force_log
-
-    if use_log_scale:
-        fig.update_yaxes(
-        type="log",
-        row=1, col=1,
-        tickformat=".2f",          # Shows two decimal places
-        dtick=0.30103              # Log scale step: 10^0.30103 ≈ 2
+    # ── Layout ──
+    fig.update_layout(
+        height=900,
+        showlegend=True,
+        title=f"{tkr} ({frame}) – LLM-Optimized Technical Chart",
+        xaxis_rangeslider_visible=False,
+        template="plotly_white",
     )
+
+    # Apply log or linear Y-axis to the price chart (top subplot)
+    fig.update_yaxes(type="log" if use_log else "linear", row=1, col=1)
+
+    if use_log:
+        fig.update_yaxes(
+            type="log",
+            row=1, col=1,
+            tickformat=".2f",          # Shows two decimal places
+            dtick=0.10000              # Log scale step: 10^0.30103 ≈ 2
+        )
+
+
 
     return fig
 
