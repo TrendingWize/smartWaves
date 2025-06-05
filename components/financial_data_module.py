@@ -549,7 +549,7 @@ class FinancialDataModule:
                         industry_name, exchange, date_str, str(data)[:200])
             return None
 
-    def execute_all(self, symbol_param: str, current_period_type: str = 'annual', current_period_back=current_period_back) -> Dict[str, Any]: # Renamed params
+    def execute_all(self, symbol_param: str, current_period_back: int = 0, current_period_type: str = 'annual'):
         t0 = time.perf_counter()
         logger.info("execute_all(%s, period_back=%s, period_type=%s) – start", symbol_param, current_period_back, current_period_type)
     
@@ -586,7 +586,7 @@ class FinancialDataModule:
     
             income_data = fut_income.result()
             if not income_data or not isinstance(income_data, list) or len(income_data) <= current_period_back:
-                raise RuntimeError(f"No/Insufficient income statements for {symbol_param} (need {current_period_back+1}, got {len(income_data) if income_data else 0})")
+                f"No/Insufficient income statements for {tkr} (need {current_period_back+1}, got {len(income_data) if income_data else 0})"
     
             target_income_statement = income_data[current_period_back]
             filing_date = target_income_statement.get("fillingDate")
