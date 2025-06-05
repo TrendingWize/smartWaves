@@ -548,7 +548,7 @@ class FinancialDataModule:
                         industry_name, exchange, date_str, str(data)[:200])
             return None
 
-    def execute_all(self, symbol_param: str, current_period_back: int = 0, current_period_type: str = 'annual', current_period_back=current_period_back) -> Dict[str, Any]: # Renamed params
+    def execute_all(self, symbol_param: str, current_period_back: int = 0, current_period_type: str = 'annual') -> Dict[str, Any]: # Renamed params
         t0 = time.perf_counter()
         logger.info("execute_all(%s, period_back=%s, period_type=%s) – start", symbol_param, current_period_back, current_period_type)
     
