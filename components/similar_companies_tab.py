@@ -328,3 +328,82 @@ def similar_companies_tab_content() -> None:
                             )
                         col_idx += 1
                 st.divider()
+
+
+def similarity_over_time_tab_content():
+    st.title("📈 Similarity Over Time")
+    st.markdown("""
+    Find companies whose financial similarity to the target has **increased the most** over your chosen time window.
+    """)
+    # --- Copy the full UI block from similar_companies_tab_content, up to the search button, but use different keys ---
+    # (copy-paste, then tweak keys: e.g. "so_time_symbol_input" etc.)
+
+    # ... [UI code here -- copy all the filter input code, just change keys to avoid collision]
+
+    # Assume all filter UI variables defined, like: target_symbol, start_year, end_year, family_value, etc.
+
+    if st.button("🚀 Find Movers Towards Target", key="so_time_search_button"):
+        # Use existing code to get candidate universe, but fetch all years separately
+        neo_driver = get_neo4j_driver()
+        k_results = 20  # Always 20 for this mode
+
+        try:
+            # Get all candidates, just as in the other function
+            all_candidates = get_nearest_aggregate_similarities(
+                _driver=neo_driver,
+                target_sym=target_symbol,
+                embedding_family=family_value,
+                start_year=start_year,
+                end_year=end_year,
+                k=200,  # Get a bigger candidate pool
+                sectors=db_selected_sectors,
+                cap_classes=db_selected_cap_classes,
+                weight_scheme="mean",  # or whatever
+                decay_lambda=DEFAULT_DECAY,
+                normalize=True
+            )
+        except Exception as e:
+            st.error(f"❌ Similarity search failed: {str(e)}")
+            return
+
+        movers = []
+        # Now, for each candidate, get first and last year similarity
+        for sym, _ in all_candidates:
+            try:
+                # Score for start year
+                sim_start = calculate_similarity_scores(
+                    _driver=neo_driver,
+                    target_sym=target_symbol,
+                    candidate_sym=sym,
+                    embedding_family=family_value,
+                    year=start_year,
+                    normalize=True
+                )
+                # Score for end year
+                sim_end = calculate_similarity_scores(
+                    _driver=neo_driver,
+                    target_sym=target_symbol,
+                    candidate_sym=sym,
+                    embedding_family=family_value,
+                    year=end_year,
+                    normalize=True
+                )
+                delta = sim_end - sim_start
+                if delta > 0:
+                    movers.append((sym, sim_start, sim_end, delta))
+            except Exception:
+                continue
+
+        # Sort by delta descending, take top 20
+        movers.sort(key=lambda x: -x[3])
+        movers = movers[:k_results]
+
+        if not movers:
+            st.info("ℹ️ No movers found with current filters.")
+        else:
+            st.divider()
+            st.subheader(f"🏃‍♂️ Top {k_results} Movers Towards {target_symbol}")
+            for idx, (sym, s_start, s_end, delta) in enumerate(movers, 1):
+                st.write(f"**{idx}. {sym}**: Δ Similarity = {delta:.2%} ({s_start:.2%} → {s_end:.2%})")
+                # Optionally, plot a mini-trend (fetch per-year similarity and show as line chart/sparkline)
+
