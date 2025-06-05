@@ -224,7 +224,7 @@ if run_btn:
         # Tabs
         tabs = st.tabs(["Gemini", "GPT"])
         with tabs[0]:
-            with st.spinner("Gemini is thinking …"):
+            with st.spinner("AI is thinking …"):
                 gemini_response = ask_gemini(cmp, prompt)
                 if c_language.lower() == "arabic":
                     st.markdown(
