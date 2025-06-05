@@ -261,6 +261,8 @@ class FinancialDataModule:
                      raise RuntimeError(
                     f"No/Insufficient income statements for {symbol_param} (need {current_period_back+1}, got {len(income_data) if income_data else 0})"
                     )
+                target_income_statement = income_data[current_period_back]
+
 
                 bs_data = fut_bs[tkr].result() # Changed variable name
                 
