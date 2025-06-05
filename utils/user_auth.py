@@ -225,7 +225,7 @@ def display_ai_analysis_dashboard(analysis_data: Dict[str, Any], metadata: Dict[
                     abs_metrics_value_cols[metric_key] = 'value'
                     abs_metrics_is_percent[metric_key] = False
         
-        plot_financial_performance_charts_row(abs_metrics_df_dict, abs_metrics_titles, abs_metrics_value_cols, abs_metrics_is_percent)
+        #plot_financial_performance_charts_row(abs_metrics_df_dict, abs_metrics_titles, abs_metrics_value_cols, abs_metrics_is_percent)
         
         # Display explanations for this group if available
         for metric_key_orig, _ in [("revenues", ""), ("profitability_metrics.grossProfit", ""), ("profitability_metrics.operating_income", ""), ("profitability_metrics.net_income", "")]:
@@ -271,7 +271,7 @@ def display_ai_analysis_dashboard(analysis_data: Dict[str, Any], metadata: Dict[
                     margin_metrics_value_cols[metric_key] = 'value_percent'
                     margin_metrics_is_percent[metric_key] = True
         
-        plot_financial_performance_charts_row(margin_metrics_df_dict, margin_metrics_titles, margin_metrics_value_cols, margin_metrics_is_percent)
+        #plot_financial_performance_charts_row(margin_metrics_df_dict, margin_metrics_titles, margin_metrics_value_cols, margin_metrics_is_percent)
 
         # Display explanations for margins
         for metric_key_orig, _ in [("gross_margin", ""), ("ebitda_margin", ""), ("net_margin", ""), ("profitability_metrics.roic", "")]:
