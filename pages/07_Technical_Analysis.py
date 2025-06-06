@@ -217,6 +217,9 @@ if run_btn:
             - **Bias:** Bullish/Base/Bearish (1–5 scale)  
             - **Entry Triggers:** breakout + volume  
             - **Timeframe Alignment:** conflicts if any
+
+            #### 5. **Recommendation**
+            -[Strong sell, Sell, Hold, Buy, Strong Buy]
             ''')
 
             tabs = st.tabs(["Gemini"])
