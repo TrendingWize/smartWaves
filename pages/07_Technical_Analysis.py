@@ -222,7 +222,7 @@ if run_btn:
             -[Strong sell, Sell, Hold, Buy, Strong Buy]
             ''')
 
-            tabs = st.tabs(["Gemini"])
+            tabs = st.tabs(["Model 1"])
             with tabs[0]:
                 with st.spinner("AI model is thinking …"):
                     gemini_response = ask_gemini(img_path, prompt)
