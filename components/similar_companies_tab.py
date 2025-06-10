@@ -214,6 +214,25 @@ def similar_companies_tab_content() -> None:
                         decay_lambda=decay_lambda_val, # Pass the decay lambda
                         normalize=True # This param is in utils_helpers version, though normalization is internal
                     )
+
+                    # Enforce full data coverage
+                    valid_years = list(range(start_year, end_year + 1))
+                    filtered_peers = []
+                    for sym, score in peers:
+                        try:
+                            vectors_by_year = load_vectors_for_similarity(
+                                _driver=neo_driver,
+                                symbol=sym,
+                                embedding_family=family_value,
+                                year_range=(start_year, end_year)
+                    )
+                            
+                            if all(str(y) in vectors_by_year for y in valid_years):
+                                filtered_peers.append((sym, score))
+                        except Exception:
+                            continue  # skip companies with vector load issues
+
+                    peers = filtered_peers
                 except Exception as e:
                     st.error(f"❌ Similarity Search failed: {str(e)}")
                     peers = [] # Ensure peers is an empty list on error
