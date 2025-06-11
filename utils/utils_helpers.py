@@ -12,6 +12,17 @@ NEO4J_USER = st.secrets.get("NEO4J_USER", "neo4j")
 NEO4J_PASSWORD = st.secrets.get("NEO4J_PASSWORD", "BhpVJhR0i8NxbDPU29OtvveNE8Wx3X2axPI7mS7zXW0")
 
 
+def safe_scalar(val):
+    if isinstance(val, pd.Series):
+        return val.iloc[0]
+    if hasattr(val, "item"):
+        try:
+            return val.item()
+        except Exception:
+            return val
+    return val
+
+
 def calculate_delta(current_value, previous_value):
     """
     Calculates the difference between current and previous values.
