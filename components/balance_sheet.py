@@ -353,7 +353,8 @@ def balance_sheet_tab_content(selected_symbol_from_app):
                                 prev_val = df_display_interactive_bs.loc[metric_key_name, df_display_interactive_bs.columns[i-1]]
                                 arrow_html_val = _arrow(prev_val, current_val, is_percent=is_ratio_metric_row) # is_percent used for arrow direction logic
                             formatted_val = format_value(current_val, is_ratio=is_ratio_metric_row, currency_symbol="" if is_ratio_metric_row else "$")
-                            cell_content = "N/A" if pd.isna(current_val) else f"{formatted_val}{arrow_html_val}"
+                            scalar_val = safe_scalar(current_val)
+                            cell_content = "N/A" if pd.isna(scalar_val) else formatted_val
                             row_cols[i+1].markdown(f"<div style='{table_cell_common_style}'>{cell_content}</div>", unsafe_allow_html=True)
                         with row_cols[-1]:
                              st.markdown(f"<div style='{plot_cell_style} display:flex; align-items:center; justify-content:center; height:100%;'>", unsafe_allow_html=True)
