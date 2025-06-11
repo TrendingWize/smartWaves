@@ -9,6 +9,17 @@ from utils.utils_helpers  import (                   # ← pull everything from 
     _arrow,
     R_display_metric_card,
 )
+
+def safe_scalar(val):
+    if isinstance(val, pd.Series):
+        return val.iloc[0]
+    if hasattr(val, "item"):
+        try:
+            return val.item()
+        except Exception:
+            return val
+    return val
+
 # --- Data Fetching for Balance Sheet ---
 @st.cache_data(ttl="1h")
 def fetch_balance_sheet_data(_driver, symbol: str, start_year: int) -> pd.DataFrame:
