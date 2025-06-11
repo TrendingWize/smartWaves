@@ -1,9 +1,9 @@
 # components/income_statement.py
 import streamlit as st
 import pandas as pd
-import numpy as np # Import numpy for np.nan if you prefer that over None
+import numpy as np
 import plotly.express as px
-from utils.utils_helpers import (                   # ← pull everything from utils.py instead
+from utils.utils_helpers import (
     calculate_delta,
     _arrow,
     R_display_metric_card,
@@ -11,7 +11,7 @@ from utils.utils_helpers import (                   # ← pull everything from u
     get_neo4j_driver,
     format_value
 )
-# --- Main Tab Function ---
+
 def income_statement_tab_content(selected_symbol_from_app):
     symbol = selected_symbol_from_app
     start_year_default = 2017
@@ -115,53 +115,3 @@ def income_statement_tab_content(selected_symbol_from_app):
 
     table_html += "</tbody></table>"
     st.markdown(table_html, unsafe_allow_html=True)
-
-
-
-if __name__ == "__main__":
-    st.set_page_config(layout="wide", page_title="Income Statement Test")
-    # ... (Mock functions as before, they should work with the NA handling) ...
-    # Ensure mock data does not produce pd.NA if your mock driver doesn't handle it; use np.nan instead for mocks.
-    # Or, if your mock data DOES produce pd.NA, this new code should handle it.
-
-    class MockNeo4jDriver:
-        def session(self, database=None): return self
-        def __enter__(self): return self
-        def __exit__(self, type, value, traceback): pass
-        def run(self, query, **kwargs):
-            if kwargs.get("sym") == "NVDA": # Example symbol
-                sample_data_nvda = {
-                    'year': [2020, 2021, 2022, 2023],
-                    'revenue': [100e6, 120e6, pd.NA, 180e6], # Test with pd.NA
-                    'costOfRevenue': [40e6, 50e6, 60e6, 70e6],
-                    'grossProfit': [60e6, 70e6, 90e6, 110e6],
-                    'researchAndDevelopmentExpenses': [10e6, 12e6, 15e6, 18e6],
-                    'sellingGeneralAndAdministrativeExpenses': [8e6, 9.5e6, 11e6, 12.5e6],
-                    'generalAndAdministrativeExpenses': [3e6, 3.5e6, 4e6, 4.5e6],
-                    'operatingExpenses': [18e6, 21.5e6, 26e6, 30.5e6],
-                    'operatingIncome': [42e6, 48.5e6, pd.NA, 79.5e6], # Test with pd.NA
-                    'interestIncome': [0.5e6, 0.6e6, 0.7e6, 0.8e6],
-                    'interestExpense': [1e6, 1.1e6, 1.2e6, 1.3e6],
-                    'incomeBeforeTax': [41.5e6, 48e6, 63.5e6, 79e6],
-                    'incomeTaxExpense': [8.3e6, 9.6e6, 12.7e6, 15.8e6],
-                    'netIncome': [33.2e6, 38.4e6, 50.8e6, 63.2e6],
-                }
-                records = []
-                for i in range(len(sample_data_nvda['year'])):
-                    record_data = {key: sample_data_nvda[key][i] for key in sample_data_nvda}
-                    class MockRecord:
-                        def __init__(self, data): self._data = data
-                        def data(self): return self._data
-                    records.append(MockRecord(record_data))
-                return records
-            return []
-        def verify_connectivity(self): pass
-
-    _original_get_driver = get_neo4j_driver
-    def mock_get_neo4j_driver(): return MockNeo4jDriver()
-    get_neo4j_driver = mock_get_neo4j_driver
-    
-    if 'global_selected_symbol' not in st.session_state:
-        st.session_state.global_selected_symbol = "NVDA"
-    income_statement_tab_content(st.session_state.global_selected_symbol)
-    get_neo4j_driver = _original_get_driver
