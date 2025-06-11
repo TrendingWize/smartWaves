@@ -358,10 +358,12 @@ def balance_sheet_tab_content(selected_symbol_from_app):
                         
                         row_cols[0].markdown(f"<div style='{metric_cell_style_base} padding-left: 25px;'>{metric_display_name_row}</div>", unsafe_allow_html=True)
                         for i, year_val in enumerate(df_display_interactive_bs.columns):
-                            current_val = df_display_interactive_bs.loc[metric_key_name, year_val]
+                            current_val = safe_scalar(df_display_interactive_bs.loc[metric_key_name, year_val])
+
                             arrow_html_val = "" 
                             if i > 0: 
-                                prev_val = df_display_interactive_bs.loc[metric_key_name, df_display_interactive_bs.columns[i-1]]
+                                prev_val = safe_scalar(df_display_interactive_bs.loc[metric_key_name, df_display_interactive_bs.columns[i - 1]])
+
                                 arrow_html_val = _arrow(prev_val, current_val, is_percent=is_ratio_metric_row) # is_percent used for arrow direction logic
                             formatted_val = format_value(current_val, is_ratio=is_ratio_metric_row, currency_symbol="" if is_ratio_metric_row else "$")
                             scalar_val = safe_scalar(current_val)
@@ -383,7 +385,8 @@ def balance_sheet_tab_content(selected_symbol_from_app):
                         current_val = df_display_interactive_bs.loc[metric_key_name, year_val]
                         arrow_html_val = ""
                         if i > 0: 
-                            prev_val = df_display_interactive_bs.loc[metric_key_name, df_display_interactive_bs.columns[i-1]]
+                            prev_val = safe_scalar(df_display_interactive_bs.loc[metric_key_name, df_display_interactive_bs.columns[i - 1]])
+
                             arrow_html_val = _arrow(prev_val, current_val, is_percent=is_ratio_metric_row)
                         formatted_val = format_value(current_val, is_ratio=is_ratio_metric_row, currency_symbol="" if is_ratio_metric_row else "$")
                         cell_content = "N/A" if pd.isna(current_val) else f"{formatted_val}{arrow_html_val}"
