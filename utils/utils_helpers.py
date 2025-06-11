@@ -21,22 +21,26 @@ def calculate_delta(current_value, previous_value):
         return None 
     return current_value - previous_value
 
-def _arrow(prev_val, curr_val, is_percent=False): # is_percent can influence how "better" is judged for some metrics
-    """
-    Generates an HTML span with an arrow indicating change direction.
-    Green up arrow for increase, red down arrow for decrease, neutral for no change or NA.
-    """
+def _arrow(prev_val, curr_val, is_percent=False):
+    try:
+        prev_val = prev_val.item() if hasattr(prev_val, "item") else prev_val
+        curr_val = curr_val.item() if hasattr(curr_val, "item") else curr_val
+    except Exception:
+        return " →"
+
+    if isinstance(prev_val, pd.Series) or isinstance(curr_val, pd.Series):
+        return " →"
+
     if pd.isna(prev_val) or pd.isna(curr_val):
-        return " →" # Neutral arrow for missing data
-    
-    # Simple comparison: higher is up, lower is down.
-    # For specific metrics (e.g., expenses), a decrease might be positive.
-    # This function provides a generic visual cue; context is handled by interpretation.
+        return " →"
+
     if curr_val > prev_val:
-        return " <span style='color:green; font-weight:bold;'>↑</span>"
-    if curr_val < prev_val:
-        return " <span style='color:red; font-weight:bold;'>↓</span>"
-    return " →" # Neutral for no change
+        return ' <span style="color:green">↑</span>'
+    elif curr_val < prev_val:
+        return ' <span style="color:red">↓</span>'
+    else:
+        return ' →'
+
 
 
 def R_display_metric_card(st_container, label: str, latest_data: pd.Series, prev_data: pd.Series, 
