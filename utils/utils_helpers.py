@@ -510,19 +510,24 @@ def fetch_income_statement_data(_driver, symbol: str, start_yr: int = 2017, end_
 
 # ── Formatting and Styling Helpers ─────────────────────────────────────
 def format_value(value, is_percent=False, currency_symbol="$", is_ratio=False, decimals=2):
-    if pd.isna(value) or value is None:
+    try:
+        # Convert to scalar if it's a Series
+        if hasattr(value, "item"):
+            value = value.item()
+        elif isinstance(value, pd.Series):
+            value = value.iloc[0]  # fallback to first element
+    except Exception:
         return "N/A"
-    if is_percent:
-        return f"{value:.{decimals}f}%"
-    if is_ratio:
-        return f"{value:.{decimals}f}"
-    if isinstance(value, (int, float)):
-        num_str = ""
-        abs_value = abs(value)
-        if abs_value >= 1_000_000_000_000: num_str = f"{value / 1_000_000_000_000:.{decimals}f}T"
-        elif abs_value >= 1_000_000_000: num_str = f"{value / 1_000_000_000:.{decimals}f}B"
-        elif abs_value >= 1_000_000: num_str = f"{value / 1_000_000:.{decimals}f}M"
-        elif abs_value >= 1_000: num_str = f"{value / 1_000:.{decimals}f}K"
-        else: num_str = f"{value:,.{decimals}f}"
-        return f"{currency_symbol}{num_str}" if currency_symbol and num_str else num_str
-    return str(value)
+
+    if value is None or pd.isna(value):
+        return "N/A"
+
+    try:
+        if is_percent:
+            return f"{value:.{decimals}f}%"
+        elif is_ratio:
+            return f"{value:.{decimals}f}"
+        else:
+            return f"{currency_symbol}{value:,.{decimals}f}"
+    except Exception:
+        return str(value)
