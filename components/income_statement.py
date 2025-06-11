@@ -254,7 +254,9 @@ def income_statement_tab_content(selected_symbol_from_app):
 
                     arrow_html_val = ""
                     if i > 0:
-                        prev_val = df_display_interactive.loc[metric_key_name, df_display_interactive.columns[i-1]]
+                        prev_val = safe_get_scalar(df_display_interactive.loc[metric_key_name, df_display_interactive.columns[i - 1]])
+                        current_val = safe_get_scalar(df_display_interactive.loc[metric_key_name, year_val])
+
                         try:
                             scalar_prev = prev_val.item() if hasattr(prev_val, "item") else prev_val
                             scalar_curr = current_val.item() if hasattr(current_val, "item") else current_val
