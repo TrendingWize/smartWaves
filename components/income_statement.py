@@ -11,6 +11,14 @@ from utils.utils_helpers import (                   # ← pull everything from u
     get_neo4j_driver,
     format_value
 )
+
+def safe_get_scalar(val):
+    if isinstance(val, pd.Series):
+        return val.iloc[0]
+    if hasattr(val, "item"):
+        return val.item()
+    return val
+
 # --- Main Tab Function ---
 def income_statement_tab_content(selected_symbol_from_app):
     symbol = selected_symbol_from_app
