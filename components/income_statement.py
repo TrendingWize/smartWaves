@@ -252,7 +252,15 @@ def income_statement_tab_content(selected_symbol_from_app):
                     arrow_html_val = ""
                     if i > 0:
                         prev_val = df_display_interactive.loc[metric_key_name, df_display_interactive.columns[i-1]]
-                        arrow_html_val = _arrow(prev_val, current_val, is_percent=is_percent_metric_row)
+                        try:
+                            scalar_prev = prev_val.item() if hasattr(prev_val, "item") else prev_val
+                            scalar_curr = current_val.item() if hasattr(current_val, "item") else current_val
+                        except Exception:
+                            scalar_prev = prev_val
+                            scalar_curr = current_val
+
+                        arrow_html_val = _arrow(scalar_prev, scalar_curr, is_percent=is_percent_metric_row)
+
 
                     # format_value will handle np.nan or None by returning "N/A"
                     formatted_val = format_value(current_val,
