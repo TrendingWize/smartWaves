@@ -249,6 +249,9 @@ def income_statement_tab_content(selected_symbol_from_app):
 
                 for i, year_val in enumerate(df_display_interactive.columns):
                     current_val = df_display_interactive.loc[metric_key_name, year_val]
+                    if isinstance(current_val, pd.Series):
+                        current_val = current_val.iloc[0]
+
                     arrow_html_val = ""
                     if i > 0:
                         prev_val = df_display_interactive.loc[metric_key_name, df_display_interactive.columns[i-1]]
