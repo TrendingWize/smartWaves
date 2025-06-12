@@ -105,7 +105,7 @@ def save_composite_chart_plotly(df, tkr, frame, chart_type="candlestick"):
     fig.add_trace(go.Scatter(x=df.index, y=df["sma50"], name="SMA50", line=dict(color="orange")), row=1, col=1)
     fig.add_trace(go.Scatter(x=df.index, y=df["sma100"], name="SMA100", line=dict(color="blue")), row=1, col=1)
 
-    fig.add_trace(go.Bar(x=df.index, y=df["volume"], name="Volume", marker_color="gray"), row=2, col=1)
+    fig.add_trace(go.Bar(x=df.index, y=df["volume"], name="Volume", marker_color="darkgray"), row=2, col=1)
 
     fig.add_trace(go.Scatter(x=df.index, y=df["macd"], name="MACD", line=dict(color="royalblue")), row=3, col=1)
     fig.add_trace(go.Scatter(x=df.index, y=df["macd_signal"], name="Signal", line=dict(color="orangered")), row=3, col=1)
