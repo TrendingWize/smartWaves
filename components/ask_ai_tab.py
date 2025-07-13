@@ -102,7 +102,7 @@ def run_ask_ai_ui(provider: str):
                     import openai
                     client = openai.OpenAI()
                     stream = client.chat.completions.create(
-                        model="gpt-4",
+                        model="gpt-4o",
                         messages=[{"role": "user", "content": prompt}],
                         stream=True,
                         temperature=0.3
